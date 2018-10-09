@@ -248,10 +248,10 @@ class AplEnv(gym.Env):
         reward = .0
         if not is_valid_pos:
             #print("CRASH /////////////////////////////////")
-            return -100
+            return -500
         if self._has_drone_arrived_hiker(self.drone.x, self.drone.y):
             #print("DRONE MADE IT**************************!!!")
-            return 100
+            return 500
         else:
             approach = self._distance_to_hiker(self.drone.x_t_minus_1,
                                                self.drone.y_t_minus_1,
