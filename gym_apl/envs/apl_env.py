@@ -84,11 +84,13 @@ class AplEnv(gym.Env):
             done = True
         else:
             done = self._has_drone_arrived_hiker(self.drone.x, self.drone.y)
+        has_reached_max_time = False
         if self.number_step == self.T_MAX:
             print("ccccccccccccccccccccccccccc MAX TIME REACHED")
+            has_reached_max_time = True
             done = True
         self.observations = self._get_observations(valid_drone_pos)
-        reward = self._reward(valid_drone_pos or done)
+        reward = self._reward(valid_drone_pos, has_reached_max_time)
         info = {}
         #print(action, reward, self.observations)
         return self.observations, reward, done, info
@@ -242,13 +244,16 @@ class AplEnv(gym.Env):
             return True
         return False
 
-    def _reward(self, is_valid_pos):
+    def _reward(self, is_valid_pos, reached_max_time):
         """ If the drone is not on a valid position return negative reward,
             else, negative distance to the hiker """
         reward = .0
         if not is_valid_pos:
             print("CRASH or TIME_MAX /////////////////////////////////")
             return -500
+        #if reached_max_time:
+            #print("TTTTTTTTTTTTT REACHED MAX TIME TTTTTTTTTTTTTTTTTT")
+            #return -500
         if self._has_drone_arrived_hiker(self.drone.x, self.drone.y):
             print("DRONE MADE IT**************************!!!")
             return 500
