@@ -88,7 +88,7 @@ class AplEnv(gym.Env):
             #print("ccccccccccccccccccccccccccc MAX TIME REACHED")
             done = True
         self.observations = self._get_observations(valid_drone_pos)
-        reward = self._reward(valid_drone_pos)
+        reward = self._reward(valid_drone_pos or done)
         info = {}
         #print(action, reward, self.observations)
         return self.observations, reward, done, info
