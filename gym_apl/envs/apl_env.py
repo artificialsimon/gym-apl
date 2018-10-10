@@ -263,9 +263,9 @@ class AplEnv(gym.Env):
                 - self._distance_to_hiker(self.drone.x, self.drone.y,
                                           normalise=True)
             if approach > 0:
-                reward = 10.0
+                reward = 1.0
             else:
-                reward = -.5
+                reward = -1
         return reward
 
     def _get_observations(self, valid_drone_pos):
