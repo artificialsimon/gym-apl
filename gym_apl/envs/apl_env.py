@@ -86,7 +86,6 @@ class AplEnv(gym.Env):
             done = self._has_drone_arrived_hiker(self.drone.x, self.drone.y)
         has_reached_max_time = False
         if self.number_step == self.T_MAX:
-            print("ccccccccccccccccccccccccccc MAX TIME REACHED")
             has_reached_max_time = True
             done = True
         self.observations = self._get_observations(valid_drone_pos)
