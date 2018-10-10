@@ -251,12 +251,12 @@ class AplEnv(gym.Env):
         if not is_valid_pos:
             print("CRASH or TIME_MAX /////////////////////////////////")
             return -500
-        #if reached_max_time:
-            #print("TTTTTTTTTTTTT REACHED MAX TIME TTTTTTTTTTTTTTTTTT")
-            #return -500
+        if reached_max_time:
+            print("TTTTTTTTTTTTT REACHED MAX TIME TTTTTTTTTTTTTTTTTT")
+            return -500
         if self._has_drone_arrived_hiker(self.drone.x, self.drone.y):
             print("DRONE MADE IT**************************!!!")
-            return 500
+            return 1000
         else:
             approach = self._distance_to_hiker(self.drone.x_t_minus_1,
                                                self.drone.y_t_minus_1,
