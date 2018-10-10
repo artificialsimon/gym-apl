@@ -265,7 +265,7 @@ class AplEnv(gym.Env):
             if approach > 0:
                 reward = 1.0
             else:
-                reward = -1
+                reward = -1.0
         return reward
 
     def _get_observations(self, valid_drone_pos):
