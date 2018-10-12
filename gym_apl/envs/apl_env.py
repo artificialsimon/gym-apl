@@ -30,6 +30,7 @@ class AplEnv(gym.Env):
     Y_MAX = 499
     Y_MIN = 0
     T_MAX = 1000  # has to be the same in GA3C
+    ARRIVE_THRESHOLD = 4
     if not MINIMUM_ENV:
         TOP_CAMERA_X = 10
         TOP_CAMERA_Y = 10
@@ -83,7 +84,7 @@ class AplEnv(gym.Env):
         if not valid_drone_pos:
             done = True
         else:
-            done = self._has_drone_arrived_hiker(self.drone.x, self.drone.y)
+            done = self._has_drone_arrived_hiker(self.drone.x, self.drone.y, self.ARRIVE_THRESHOLD)
         has_reached_max_time = False
         if self.number_step == self.T_MAX:
             has_reached_max_time = True
@@ -198,6 +199,7 @@ class AplEnv(gym.Env):
                 self.drone.x > self.X_MAX or \
                 self.drone.y < self.Y_MIN or \
                 self.drone.y > self.Y_MAX:
+            print("          OUT OF BOUNDS")
             return False
         if not np.isin(self.drone.alt, self.ALTITUDES):
             return False
@@ -208,6 +210,7 @@ class AplEnv(gym.Env):
         if self.CHECK_ALTITUDE:
             if self.drone.alt <= \
                self.full_altitude_map[self.drone.x][self.drone.y]:
+                print("                         CRASHED")
                 return False
         return True
 
@@ -237,9 +240,10 @@ class AplEnv(gym.Env):
             next_x += -1
         return next_x, next_y, next_alt, next_head
 
-    def _has_drone_arrived_hiker(self, x_pos, y_pos):
+    def _has_drone_arrived_hiker(self, x_pos, y_pos, threshold=0):
         """ Returns true if the dron is on top of the hiker """
-        if x_pos == self.hiker.x and y_pos == self.hiker.y:
+        if self.hiker.x - threshold <= x_pos <= self.hiker.x + threshold and \
+           self.hiker.y - threshold <= y_pos <= self.hiker.y + threshold:
             return True
         return False
 
@@ -248,12 +252,11 @@ class AplEnv(gym.Env):
             else, negative distance to the hiker """
         reward = .0
         if not is_valid_pos:
-            print("                CRASH or OUTSIDE ")
             return -1000
         if reached_max_time:
             print("                                   REACHED MAX TIME ")
             return -1000
-        if self._has_drone_arrived_hiker(self.drone.x, self.drone.y):
+        if self._has_drone_arrived_hiker(self.drone.x, self.drone.y, self.ARRIVE_THRESHOLD):
             print("DRONE MADE IT ")
             return 1000
         else:
@@ -263,9 +266,9 @@ class AplEnv(gym.Env):
                 - self._distance_to_hiker(self.drone.x, self.drone.y,
                                           normalise=True)
             if approach > 0:
-                reward = 1.0
+                reward = 10.0
             else:
-                reward = -1.0
+                reward = -10.0
         return reward
 
     def _get_observations(self, valid_drone_pos):
