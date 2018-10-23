@@ -29,10 +29,10 @@ class AplEnv(gym.Env):
     X_MIN = 0
     Y_MAX = 499
     Y_MIN = 0
-    T_MAX = 700  # has to be the same in GA3C
+    T_MAX = 200  # has to be the same in GA3C
     if not MINIMUM_ENV:
-        TOP_CAMERA_X = 10
-        TOP_CAMERA_Y = 10
+        TOP_CAMERA_X = 5
+        TOP_CAMERA_Y = 5
     else:
         TOP_CAMERA_X = 2
         TOP_CAMERA_Y = 1
@@ -85,7 +85,7 @@ class AplEnv(gym.Env):
         else:
             done = self._has_drone_arrived_hiker(self.drone.x, self.drone.y)
         if self.number_step == self.T_MAX:
-            #print("ccccccccccccccccccccccccccc MAX TIME REACHED")
+            print("                                          MAX TIME REACHED")
             done = True
         self.observations = self._get_observations(valid_drone_pos)
         reward = self._reward(valid_drone_pos)
@@ -171,20 +171,20 @@ class AplEnv(gym.Env):
 
     def _get_hiker_random_pos(self):
         """ Returns random position of the hiker """
-        #x_pos = rd.randint(290, 310)
-        #y_pos = rd.randint(300, 350)
-        x_pos = rd.randint(0, self.X_MAX)
-        y_pos = rd.randint(0, self.X_MAX)
+        x_pos = rd.randint(290, 310)
+        y_pos = rd.randint(300, 350)
+        #x_pos = rd.randint(0, self.X_MAX)
+        #y_pos = rd.randint(0, self.X_MAX)
         #x_pos = 300
         #y_pos = 300
         return x_pos, y_pos
 
     def _get_drone_random_pos(self):
         """ Returns random values for initial positions """
-        #x_pos = rd.randint(200, 250)
-        #y_pos = rd.randint(300, 350)
-        x_pos = rd.randint(0, self.X_MAX)
-        y_pos = rd.randint(0, self.X_MAX)
+        x_pos = rd.randint(200, 250)
+        y_pos = rd.randint(300, 350)
+        #x_pos = rd.randint(0, self.X_MAX)
+        #y_pos = rd.randint(0, self.X_MAX)
         #x_pos = 235
         #y_pos = 355
         alt = np.random.choice(self.ALTITUDES)
@@ -245,24 +245,20 @@ class AplEnv(gym.Env):
     def _reward(self, is_valid_pos):
         """ If the drone is not on a valid position return negative reward,
             else, negative distance to the hiker """
-        reward = .0
         if not is_valid_pos:
-            #print("CRASH /////////////////////////////////")
-            return -100
+            print("                 CRASH")
+            return -5. #10.
         if self._has_drone_arrived_hiker(self.drone.x, self.drone.y):
-            #print("DRONE MADE IT**************************!!!")
-            return 100
-        else:
-            approach = self._distance_to_hiker(self.drone.x_t_minus_1,
-                                               self.drone.y_t_minus_1,
-                                               normalise=True)\
-                - self._distance_to_hiker(self.drone.x, self.drone.y,
-                                          normalise=True)
-            if approach > 0:
-                reward = .0
-            else:
-                reward = -.5
-        return reward
+            print("DRONE MADE IT")
+            return 30
+        approach = self._distance_to_hiker(self.drone.x_t_minus_1,
+                                           self.drone.y_t_minus_1,
+                                           normalise=True)\
+            - self._distance_to_hiker(self.drone.x, self.drone.y,
+                                      normalise=True)
+        if approach > 0:
+            return .0
+        return -.5
 
     def _get_observations(self, valid_drone_pos):
         obs = np.zeros((self.OBS_SIZE_X, self.OBS_SIZE_Y), dtype=np.int16)
