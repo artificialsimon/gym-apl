@@ -31,8 +31,8 @@ class AplEnv(gym.Env):
     Y_MIN = 0
     T_MAX = 200  # has to be the same in GA3C
     if not MINIMUM_ENV:
-        TOP_CAMERA_X = 5
-        TOP_CAMERA_Y = 5
+        TOP_CAMERA_X = 10
+        TOP_CAMERA_Y = 10
     else:
         TOP_CAMERA_X = 2
         TOP_CAMERA_Y = 1
@@ -247,10 +247,10 @@ class AplEnv(gym.Env):
             else, negative distance to the hiker """
         if not is_valid_pos:
             print("                 CRASH")
-            return -5. #10.
+            return -30.
         if self._has_drone_arrived_hiker(self.drone.x, self.drone.y):
             print("DRONE MADE IT")
-            return 30
+            return 30.
         approach = self._distance_to_hiker(self.drone.x_t_minus_1,
                                            self.drone.y_t_minus_1,
                                            normalise=True)\
