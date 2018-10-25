@@ -29,7 +29,7 @@ class AplEnv(gym.Env):
     X_MIN = 0
     Y_MAX = 499
     Y_MIN = 0
-    T_MAX = 400  # has to be the same in GA3C
+    T_MAX = 200  # has to be the same in GA3C
     if not MINIMUM_ENV:
         TOP_CAMERA_X = 10
         TOP_CAMERA_Y = 10
@@ -171,7 +171,7 @@ class AplEnv(gym.Env):
 
     def _get_hiker_random_pos(self):
         """ Returns random position of the hiker """
-        x_pos = rd.randint(390, 410)
+        x_pos = rd.randint(290, 310)
         y_pos = rd.randint(300, 350)
         #x_pos = rd.randint(0, self.X_MAX)
         #y_pos = rd.randint(0, self.X_MAX)
