@@ -29,7 +29,7 @@ class AplEnv(gym.Env):
     X_MIN = 0
     Y_MAX = 499
     Y_MIN = 0
-    T_MAX = 200  # has to be the same in GA3C
+    T_MAX = 400  # has to be the same in GA3C
     if not MINIMUM_ENV:
         TOP_CAMERA_X = 10
         TOP_CAMERA_Y = 10
