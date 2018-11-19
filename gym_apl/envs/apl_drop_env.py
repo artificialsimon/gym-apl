@@ -1,6 +1,7 @@
 import os
 import gym
 import math
+import time
 import numpy as np
 import random as rd
 from gym import error, spaces, utils
@@ -12,13 +13,30 @@ class Drone(object):
     y = 0
     alt = 0
     head = 0
-    x_t_minus_1 = 0
-    y_t_minus_1 = 0
+    dropped = False
+    payload_x = 0
+    payload_y = 0
+    payload_status = None
 
 
 class Hiker(object):
-    x = 0
-    y = 0
+    x_global = 0
+    y_global = 0
+    x_local = 0
+    y_local = 0
+    alt = 0
+    required_payload = {}
+
+
+
+class Payload:
+    """Drone payloads type"""
+    payloads = ["EMPTY", "food", "medicine", "communications"]
+
+class PayloadStatus:
+    """Drone payloads type"""
+    status = ["OK", "OK_STUCK", "OK_SUNK", "DAMAGED",
+              "DAMAGED_STUCK", "DAMAGED_SUNK"]
 
 
 objects_code = {'mountain ridge': 0, 'trail': 1, 'shore bank': 2,
@@ -39,9 +57,11 @@ class AplDropEnv(gym.Env):
     X_MIN = 0
     Y_MAX = 499
     Y_MIN = 0
-    TOP_CAMERA_X = 20
-    TOP_CAMERA_Y = 20
+    HIKER_RELATIVE_POS = 5
+    TOP_CAMERA_X = HIKER_RELATIVE_POS * 2 + 1
+    TOP_CAMERA_Y = HIKER_RELATIVE_POS * 2 + 1
     ALTITUDES = np.array([0, 1, 2, 3, 4])
+    # TODO check in real APL for max drone alt
     MAX_DRONE_ALTITUDE = 3
     HEADINGS = np.array([1, 2, 3, 4, 5, 6, 7, 8])
     NORMALISATION_FACTOR = math.sqrt(pow(TOP_CAMERA_X / 2, 2) +
@@ -49,25 +69,22 @@ class AplDropEnv(gym.Env):
     drone = Drone()
     hiker = Hiker()
     OBS_SIZE_X = TOP_CAMERA_X
-    OBS_SIZE_Y = TOP_CAMERA_Y * 2 + 1  # Extra column for sensors
+    OBS_SIZE_Y = TOP_CAMERA_Y + 1  # Extra column for sensors
     CHECK_ALTITUDE = False
-    viewer = None
     viewer_ego = None
     cells = None
-    dronetrans = None
-    hiker_trans = None
-    observations = np.zeros((OBS_SIZE_X, OBS_SIZE_Y), dtype=np.int16)
-    fix_map_around_hiker = np.zeros((OBS_SIZE_X, OBS_SIZE_Y), dtype=np.int16)
-    dropped = False
-    dropped_x = 0
-    dropped_y = 0
-    DROP_DISTANCE_FACTOR = .0
+    observations = np.zeros((OBS_SIZE_X, OBS_SIZE_Y), dtype=np.uint8)
+    fix_map_around_hiker = np.zeros((OBS_SIZE_X, OBS_SIZE_Y), dtype=np.uint8)
+    fix_alt_map_around_hiker = np.zeros((OBS_SIZE_X, OBS_SIZE_Y),
+                                        dtype=np.uint8)
+    DROP_DISTANCE_FACTOR = 1.0
     number_step = 0
+    # render
+    dronetrans = None
+    payload_trans = None
 
     def __init__(self):
-        self.action_space = spaces.Discrete(6)
-        # PPO2 only supports Discrete or Box
-        # Building a box = camera with altitude + camera with objects + sensor
+        self.action_space = spaces.Discrete(5)
         self.observation_space = spaces.Box(low=0, high=255, dtype=np.uint8,
                                             shape=(self.OBS_SIZE_X,
                                                    self.OBS_SIZE_Y))
@@ -87,15 +104,13 @@ class AplDropEnv(gym.Env):
         """ Takes action and returns next state, reward, done flag and info """
         done = False
         self.number_step += 1
-        self.drone.x_t_minus_1 = self.drone.x
-        self.drone.y_t_minus_1 = self.drone.y
         next_x, next_y, next_alt, next_head = self._one_step(action)
         self.drone.x = next_x
         self.drone.y = next_y
         self.drone.alt = next_alt
         self.drone.head = next_head
         valid_drone_pos = self._is_valid_drone_pos()
-        if not valid_drone_pos or self.dropped or \
+        if not valid_drone_pos or self.drone.dropped or \
            self.number_step == 50:
             done = True
         self.observations = self._get_observations(valid_drone_pos)
@@ -107,30 +122,44 @@ class AplDropEnv(gym.Env):
     def reset(self):
         """ Sets initial state for the env """
         self.number_step = 0
+        # Random hiker position
+        self.hiker.x_global, self.hiker.y_global, \
+            self.hiker.x_local, self.hiker.y_local, \
+            self.hiker.alt = self._get_hiker_random_pos()
+        while not self._is_valid_hiker_pos():
+            self.hiker.x_global, self.hiker.y_global, \
+                self.hiker.x_local, self.hiker.y_local, \
+                self.hiker.alt = self._get_hiker_random_pos()
         # Random drone position
         self.drone.x, self.drone.y, self.drone.alt, self.drone.head = \
             self._get_drone_random_pos()
-        while not self._is_valid_drone_pos_absoulte():
+        while not self._is_valid_drone_pos():
             self.drone.x, self.drone.y, self.drone.alt, self.drone.head = \
                 self._get_drone_random_pos()
-        self.fix_map_around_hiker = self._get_map_around(self.drone.x,
-                                                         self.drone.y)
-        # positioning drone inside camera
-        self.drone.x = int(self.TOP_CAMERA_X / 2)
-        self.drone.y = int(self.TOP_CAMERA_Y / 2)
-        # hiker in same relative pos as drone
-        self.hiker.x = self.drone.x
-        self.hiker.y = self.drone.y
-        self.dropped = False
+        self.fix_map_around_hiker = self._get_map_around(self.hiker.x_global,
+                                                         self.hiker.y_global)
+        self.fix_alt_map_around_hiker = \
+            self._get_alt_map_around(self.hiker.x_global,
+                                     self.hiker.y_global)
+        self.drone.payload_x = 0
+        self.drone.payload_y = 0
+        self.drone.payload_status = None
+        self.hiker.required_payload = [Payload.payloads[1],
+                                       Payload.payloads[2],
+                                       Payload.payloads[3],
+                                       Payload.payloads[1]]
+        if self.viewer_ego is not None:
+            self._reset_viewer()
+            if self.drone.dropped:
+                time.sleep(1)
+        self.drone.dropped = False
         return self._get_observations(True)
 
     def render(self, mode='human', close=False):
-        screen_width = self.Y_MAX
-        screen_height = self.X_MAX
+        from gym.envs.classic_control import rendering
         cell_width = 20
         cell_height = 20
         if self.viewer_ego is None:
-            from gym.envs.classic_control import rendering
             self.viewer_ego = rendering.Viewer(self.OBS_SIZE_Y * cell_width,
                                                self.OBS_SIZE_X * cell_height)
             self.cells = [[rendering.FilledPolygon(
@@ -147,12 +176,42 @@ class AplDropEnv(gym.Env):
                                                    rd.random())
               for x_cell in range(self.OBS_SIZE_X)]
              for y_cell in range(self.OBS_SIZE_Y)]
-        from gym.envs.classic_control import rendering
+            drone = rendering.FilledPolygon(
+                [(1, 1), (1, cell_width), (cell_width, int(cell_height / 2))])
+            self.dronetrans = rendering.Transform()
+            drone.add_attr(self.dronetrans)
+            self.viewer_ego.add_geom(drone)
+            self.dronetrans.set_translation(self.drone.x * cell_width,
+                                            self.drone.y * cell_height)
+            drone.set_color(.8, .6, .3)
+            payload = rendering.FilledPolygon(
+                [(3, 3), (3, cell_width * .75),
+                 (cell_height * .75, cell_height * .75),
+                 (cell_height * .75, 3)])
+            self.payload_trans = rendering.Transform()
+            payload.add_attr(self.payload_trans)
+            self.viewer_ego.add_geom(payload)
+            self.payload_trans.set_translation(-100, -100)
+            payload.set_color(.3, .3, .8)
+        self.dronetrans.set_translation(self.drone.x * cell_width,
+                                        self.drone.y * cell_height)
+        if self.drone.dropped:
+            #self.dronetrans.set_translation(1, 1)
+            self.payload_trans.set_translation(
+                (self.drone.payload_x) * cell_width,
+                self.drone.payload_y * cell_height)
+        if not self._is_valid_drone_pos():
+            self.dronetrans.set_translation(-100, -100)
+
         self._set_cells_color()
+        time.sleep(0.09)
         return self.viewer_ego.render(return_rgb_array=mode == 'rgb_array')
 
-    def seed(self, seed=None):
-        return 1
+    def _reset_viewer(self):
+        self.payload_trans.set_translation(-100, -100)
+
+    #def seed(self, seed=None):
+        #return 1
 
     def _set_cells_color(self):
         for width_cell in range(self.OBS_SIZE_Y):
@@ -188,70 +247,45 @@ class AplDropEnv(gym.Env):
             0.0, 0.0, self.observations[1][self.OBS_SIZE_Y - 1] / 255)
 
     def _get_drone_random_pos(self):
-        """ Returns random values for initial positions """
-        x_pos = rd.randint(200, 250)
-        y_pos = rd.randint(200, 250)
-        #x_pos = rd.randint(0, self.X_MAX)
-        #y_pos = rd.randint(0, self.X_MAX)
-        x_pos = 100
-        y_pos = 100
+        """ Returns random values for initial positions inside view
+            relative to hiker pos
+        """
+        x_pos = rd.randint(0, self.TOP_CAMERA_X)
+        y_pos = rd.randint(0, self.TOP_CAMERA_Y)
         alt = np.random.choice(self.ALTITUDES)
         head = np.random.choice(self.HEADINGS)
-        return x_pos, y_pos, 3, 1  # alt, head
-
-    def _is_valid_drone_pos_absoulte(self):
-        """ Checks if the drone is inside absolute boundaries or not crashed """
-        if self.drone.x < self.X_MIN or \
-                self.drone.x > self.X_MAX or \
-                self.drone.y < self.Y_MIN or \
-                self.drone.y > self.Y_MAX:
-            return False
-        if not np.isin(self.drone.alt, self.ALTITUDES):
-            return False
-        if not np.isin(self.drone.head, self.HEADINGS):
-            return False
-        if self.drone.alt > self.MAX_DRONE_ALTITUDE:
-            return False
-        if self.drone.alt <= \
-           self.full_altitude_map[self.drone.x][self.drone.y]:
-            return False
-        return True
+        return x_pos, y_pos, alt, head
 
     def _is_valid_drone_pos(self):
-        """ Checks if the drone is inside relative boundaries or not crashed """
-        if self.drone.x <  0 or \
+        """ Checks if drone is inside relative boundaries or not crashed """
+        if self.drone.x < 0 or \
                 self.drone.x >= self.TOP_CAMERA_X or \
                 self.drone.y < 0 or \
                 self.drone.y >= self.TOP_CAMERA_Y:
             return False
-        if not np.isin(self.drone.alt, self.ALTITUDES):
-            return False
-        if not np.isin(self.drone.head, self.HEADINGS):
-            return False
         if self.drone.alt > self.MAX_DRONE_ALTITUDE:
             return False
         if self.CHECK_ALTITUDE:
-            if self.drone.alt <= \
-               self.fix_map_around_hiker[self.drone.x][self.drone.y]:
+            if self.drone.alt <= self.fix_alt_map_around_hiker[self.drone.x,
+                                                        self.drone.y]:
                 return False
         return True
 
     def _get_hiker_random_pos(self):
-        """ Returns random position of the hiker """
-        x_pos = rd.randint(300, 350)
-        y_pos = rd.randint(300, 350)
-        #x_pos = rd.randint(0, self.X_MAX)
-        #y_pos = rd.randint(0, self.X_MAX)
-        #x_pos = 330
-        #y_pos = 330
-        return x_pos, y_pos
+        """ Returns random position of the hiker within boundaries"""
+        x_pos = rd.randint(self.X_MIN + self.HIKER_RELATIVE_POS + 1,
+                           self.X_MAX - self.HIKER_RELATIVE_POS - 1)
+        y_pos = rd.randint(self.Y_MIN + self.HIKER_RELATIVE_POS + 1,
+                           self.Y_MAX - self.HIKER_RELATIVE_POS - 1)
+        x_pos = 300
+        y_pos = 300
+        return x_pos, y_pos, self.HIKER_RELATIVE_POS, self.HIKER_RELATIVE_POS,\
+            self.full_altitude_map[x_pos, y_pos]
 
     def _is_valid_hiker_pos(self):
-        """ Checks if the hiker is in inside boundaries """
-        if self.hiker.x < self.X_MIN or \
-                self.hiker.x > self.X_MAX or \
-                self.hiker.y < self.Y_MIN or \
-                self.hiker.y > self.Y_MAX:
+        """ validate hikers initial position """
+        # if self.hiker.alt >= self.MAX_DRONE_ALTITUDE - 1:
+        if self.hiker.alt > 1:
             return False
         return True
 
@@ -261,115 +295,95 @@ class AplDropEnv(gym.Env):
         next_y = self.drone.y
         next_alt = self.drone.alt
         next_head = self.drone.head
-        #print(action)
-        #if action == 0:  # Action == 0 is no op for GA3C!
-        if action == 1:
+        if action == 0:
             next_x += 1
-        if action == 2:
+        if action == 1:
             next_y += 1
-        if action == 3:
+        if action == 2:
             next_y += -1
-        if action == 4:
+        if action == 3:
             next_x += -1
-        if action == 5:
-            self.dropped = True
+        if action == 4:
+            self.drone.dropped, self.drone.payload_x, self.drone.payload_y, \
+                self.drone.payload_status = self.drop_payload()
             # TODO apl dynamics for dropping final place
-            self.dropped_x = self.drone.x
-            self.dropped_y = self.drone.y
+            # TODO dropping also advance drone one step forward
+            self.drone.payload_x = self.drone.x
+            self.drone.payload_y = self.drone.y
         return next_x, next_y, next_alt, next_head
+
+    def drop_payload(self):
+        """ Chooses slot to drop, drops and return final position of payload
+            and status of the payload
+        """
+        return True, self.drone.x, self.drone.y, PayloadStatus.status[0]
+
 
     def _reward(self, is_valid_pos):
         """ If the drone is not on a valid position return negative reward,
             else, negative distance to the hiker """
         reward = .0
+        reward = 1. - self._distance_to_hiker(self.drone.payload_x,
+                                                self.drone.payload_y,
+                                                normalise=True)
         if not is_valid_pos:
-            return -1
-        if self.dropped:
-            drop_reward = .0
-            distance = self._distance_to_hiker(self.drone.x, self.drone.y,
-                                               normalise=True) - 1.
-            # TODO add dropping on object probabilities
-            if self.fix_map_around_hiker[self.dropped_x][self.dropped_y] <= 0:
-                drop_reward = 1.
-            reward += drop_reward + self.DROP_DISTANCE_FACTOR * distance
+            return -1.
+        if self.drone.dropped:
+            distance = 1. - self._distance_to_hiker(self.drone.payload_x,
+                                                    self.drone.payload_y,
+                                                    normalise=True)
+            # TODO reward based on payload status
+            #reward += distance
         return reward
 
     def _get_observations(self, valid_drone_pos):
         obs = np.copy(self.fix_map_around_hiker)
-        # drone position
         if valid_drone_pos:
-            obs[self.drone.x][self.drone.y] = 9
-        if self.dropped:
-            obs[self.dropped_x][self.dropped_y] = 255
-        #obs[0][self.OBS_SIZE_Y - 1] = self.drone.alt
+            # Drone altitude
+            obs[0, self.OBS_SIZE_Y - 1] = self.drone.alt
+            # Drone heading
+            obs[1, self.OBS_SIZE_Y - 1] = self.drone.head
+            # Drone relative x pos
+            obs[2, self.OBS_SIZE_Y - 1] = self.drone.x
+            # Drone relative y pos
+            obs[3, self.OBS_SIZE_Y - 1] = self.drone.y
         return obs
 
-    def _get_map_around(self, x_pos, y_pos):
-        """ returns the map around the x and y pos, first half is altitude,
-            second is  objects code """
-        obs = np.zeros((self.OBS_SIZE_X, self.OBS_SIZE_Y), dtype=np.uint8)
+    # TODO merge _get_alt_map_around with _get_map_around
+    def _get_alt_map_around(self, x_pos, y_pos):
+        """ returns the map around the x and y pos, with objects code """
+        map_around = np.zeros((self.OBS_SIZE_X, self.OBS_SIZE_Y),
+                              dtype=np.uint8)
         for x_cell in range(self.TOP_CAMERA_X):
             for y_cell in range(self.TOP_CAMERA_Y):
                 try:
                     alt = self.full_altitude_map[
                         int(x_pos - self.TOP_CAMERA_X / 2 + x_cell)][
                             int(y_pos - self.TOP_CAMERA_Y / 2 + y_cell)]
-                    obs[x_cell][y_cell] = alt
-                    obj = self.full_objects_map[
+                    map_around[x_cell][y_cell] = alt
+                except IndexError:
+                    map_around[x_cell][y_cell] = -1
+        return map_around
+
+
+    def _get_map_around(self, x_pos, y_pos):
+        """ returns the map around the x and y pos, with objects code """
+        map_around = np.zeros((self.OBS_SIZE_X, self.OBS_SIZE_Y),
+                              dtype=np.uint8)
+        for x_cell in range(self.TOP_CAMERA_X):
+            for y_cell in range(self.TOP_CAMERA_Y):
+                try:
+                    alt = self.full_objects_map[
                         int(x_pos - self.TOP_CAMERA_X / 2 + x_cell)][
                             int(y_pos - self.TOP_CAMERA_Y / 2 + y_cell)]
-                    obs[x_cell][y_cell + self.TOP_CAMERA_Y] = obj
+                    map_around[x_cell][y_cell] = alt
                 except IndexError:
-                    obs[x_cell][y_cell] = -1
-                    obs[x_cell][y_cell + self.TOP_CAMERA_Y] = -1
-        return obs
+                    map_around[x_cell][y_cell] = -1
+        return map_around
 
-
-    def _distance_to_hiker(self, drone_x, drone_y, normalise=True):
-        dist = math.sqrt(pow(self.hiker.x - drone_x, 2) +
-                         pow(self.hiker.y - drone_y, 2))
+    def _distance_to_hiker(self, pos_x, pos_y, normalise=True):
+        dist = math.sqrt(pow(self.HIKER_RELATIVE_POS - pos_x, 2) +
+                         pow(self.HIKER_RELATIVE_POS - pos_y, 2))
         if normalise:
             dist = dist / self.NORMALISATION_FACTOR
         return dist
-
-    def _heading_to_hiker2(self):
-        """  NE, SE, SW, NW
-        APL coordinate system is (x, -y) in [0, 500), [0, 500)
-        atan2(y, x) """
-        radians = math.atan2(self.drone.x - self.hiker.x,
-                             self.drone.y - self.hiker.y)
-        # Compensating and binning for APL
-        if 0 < radians <= math.pi / 2.0:
-            return 1
-        if math.pi / 2.0 < radians <= math.pi:
-            return 2
-        if -math.pi < radians <= -math.pi / 2.0:
-            return 3
-        if -math.pi / 2.0 < radians <= 0:
-            return 4
-        return 0
-
-    def _heading_to_hiker(self):
-        """ 1 N, 2 NE, 3 E, 4 SE, 5 S, 6 SW, 7 W, 8 NW
-        APL coordinate system is (x, -y) in [0, 500), [0, 500)
-        atan2(y, x) """
-        radians = math.atan2(self.drone.x - self.hiker.x,
-                             self.drone.y - self.hiker.y)
-        # Compensating and binning for APL
-        if radians <= 1. / 8. * math.pi and radians > -1. / 8. * math.pi:
-            return 3
-        if radians <= -1. / 8. * math.pi and radians > -3. / 8. * math.pi:
-            return 2
-        if radians <= -3. / 8. * math.pi and radians > -5. / 8. * math.pi:
-            return 1
-        if radians <= -5. / 8. * math.pi and radians > -7. / 8. * math.pi:
-            return 8
-        if radians <= 3. / 8. * math.pi and radians > 1. / 8. * math.pi:
-            return 4
-        if radians <= 5. / 8. * math.pi and radians > 3. / 8. * math.pi:
-            return 5
-        if radians <= 7. / 8. * math.pi and radians > 5. / 8. * math.pi:
-            return 6
-        if radians <= -7. / 8. * math.pi or radians > 7. / 8. * math.pi:
-            return 7
-        return 0

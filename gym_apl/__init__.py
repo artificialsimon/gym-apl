@@ -6,6 +6,6 @@ register(
 )
 
 register(
-    id='apl-v1',
+    id='apldrop-v0',
     entry_point='gym_apl.envs:AplDropEnv',
 )
