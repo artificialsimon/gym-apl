@@ -172,7 +172,7 @@ class AplEnv(gym.Env):
 
     def _get_hiker_random_pos(self):
         """ Returns random position of the hiker """
-        x_pos = rd.randint(290, 310)
+        x_pos = rd.randint(200, 410)
         y_pos = rd.randint(300, 350)
         #x_pos = rd.randint(0, self.X_MAX)
         #y_pos = rd.randint(0, self.X_MAX)
@@ -182,7 +182,7 @@ class AplEnv(gym.Env):
 
     def _get_drone_random_pos(self):
         """ Returns random values for initial positions """
-        x_pos = rd.randint(200, 250)
+        x_pos = rd.randint(200, 410)
         y_pos = rd.randint(300, 350)
         #x_pos = rd.randint(0, self.X_MAX)
         #y_pos = rd.randint(0, self.X_MAX)
