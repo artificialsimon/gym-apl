@@ -29,7 +29,7 @@ class AplEnv(gym.Env):
     X_MIN = 0
     Y_MAX = 499
     Y_MIN = 0
-    T_MAX = 400  # has to be the same in GA3C
+    T_MAX = 400  # episode lenght. Not same as Config.TIME_MAX
     if not MINIMUM_ENV:
         TOP_CAMERA_X = 10
         TOP_CAMERA_Y = 10
@@ -44,20 +44,21 @@ class AplEnv(gym.Env):
     hiker = Hiker()
     OBS_SIZE_X = TOP_CAMERA_X
     OBS_SIZE_Y = TOP_CAMERA_Y + 1  # Extra column for sensors
+    IMAGE_MULTIPLIER = 8
     CHECK_ALTITUDE = True
     viewer = None
     viewer_ego = None
     cells = None
     dronetrans = None
     hiker_trans = None
-    observations = np.zeros((OBS_SIZE_X, OBS_SIZE_Y), dtype=np.int16)
+    observations = None
     number_step = 0
 
     def __init__(self):
         self.action_space = spaces.Discrete(4)
         # PPO2 only supports Discrete or Box
         # Building a box = camera + sensor
-        self.observation_space = spaces.Box(low=0, high=255, dtype=np.int16,
+        self.observation_space = spaces.Box(low=0, high=255, dtype=np.float64,
                                             shape=(self.OBS_SIZE_X,
                                                    self.OBS_SIZE_Y))
         dirname = os.path.dirname(__file__)
@@ -171,7 +172,7 @@ class AplEnv(gym.Env):
 
     def _get_hiker_random_pos(self):
         """ Returns random position of the hiker """
-        x_pos = rd.randint(390, 410)
+        x_pos = rd.randint(290, 310)
         y_pos = rd.randint(300, 350)
         #x_pos = rd.randint(0, self.X_MAX)
         #y_pos = rd.randint(0, self.X_MAX)
@@ -261,17 +262,19 @@ class AplEnv(gym.Env):
         return -.5
 
     def _get_observations(self, valid_drone_pos):
-        obs = np.zeros((self.OBS_SIZE_X, self.OBS_SIZE_Y), dtype=np.int16)
+        obs = np.zeros((self.OBS_SIZE_X, self.OBS_SIZE_Y), dtype=np.float64)
         if not self.MINIMUM_ENV:
             for x_cell in range(self.TOP_CAMERA_X):
                 for y_cell in range(self.TOP_CAMERA_Y):
                     try:
                         value = self.full_altitude_map[
                             int(self.drone.x - self.OBS_SIZE_X / 2 + x_cell)][
-                                int(self.drone.y - self.OBS_SIZE_Y / 2 + y_cell)]
-                        obs[x_cell][y_cell] = value
+                                int(self.drone.y - self.OBS_SIZE_Y / 2 +
+                                    y_cell)]
+                        obs[x_cell][y_cell] = self._image_normalise_altitude(value)
                     except IndexError:
-                        obs[x_cell][y_cell] = -1
+                        # Outside boundaries
+                        obs[x_cell][y_cell] = 0.
             # Hiker inside camera
             if self.hiker.x >= self.drone.x - self.TOP_CAMERA_X / 2 and \
                self.hiker.x < self.drone.x + self.TOP_CAMERA_X / 2 and \
@@ -279,15 +282,35 @@ class AplEnv(gym.Env):
                self.hiker.y < self.drone.y + self.TOP_CAMERA_Y / 2:
                 obs[int(self.TOP_CAMERA_X / 2 + (self.hiker.x - self.drone.x))
                     ][int(self.TOP_CAMERA_Y / 2 + (self.hiker.y - self.drone.y))]\
-                            = 5
+                            = 255.
         # Heading from drone to hiker
         #obs[0][self.OBS_SIZE_Y - 1] = self._heading_to_hiker()
         # each axis distance
-        obs[0][self.OBS_SIZE_Y - 1] = self.drone.x - self.hiker.x
-        obs[1][self.OBS_SIZE_Y - 1] = self.drone.y - self.hiker.y
+        obs[0][self.OBS_SIZE_Y - 1] = self._image_normalise_axis(
+            self.drone.x - self.hiker.x, self.X_MAX)
+        obs[1][self.OBS_SIZE_Y - 1] = self._image_normalise_axis(
+            self.drone.y - self.hiker.y, self.Y_MAX)
         # Distance from drone to hiker in [0,256)
         #obs[1][self.OBS_SIZE_Y - 1] = self._distance_to_hiker(self.drone.x, self.drone.y) * 255
+        # Extending the size of the observation
+        obs = np.kron(obs, np.ones([self.IMAGE_MULTIPLIER,
+                                    self.IMAGE_MULTIPLIER]))
         return obs
+
+    @staticmethod
+    def _image_normalise_axis(distance, max_axis):
+        """ distance in [-max_axis, max_axis]
+            return [0, 255]
+        """
+        return (distance + max_axis) / (2. * max_axis) * 255.
+
+    def _image_normalise_altitude(self, alt):
+        """ Normalises altitude
+        - 255 / max(ALTITUDES) : 255 is reserved for hiker
+        % + 1 : 0 is reserved for outside boundaries
+        """
+        return (alt / max(self.ALTITUDES)) * (
+            254. - 255. / max(self.ALTITUDES)) + 1
 
     def _distance_to_hiker(self, drone_x, drone_y, normalise=True):
         dist = math.sqrt(pow(self.hiker.x - drone_x, 2) +
