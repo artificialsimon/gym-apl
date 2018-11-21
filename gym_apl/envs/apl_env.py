@@ -29,22 +29,22 @@ class AplEnv(gym.Env):
     X_MIN = 0
     Y_MAX = 499
     Y_MIN = 0
-    T_MAX = 400  # episode lenght. Not same as Config.TIME_MAX
+    T_MAX = 200  # episode lenght. Not same as Config.TIME_MAX
     if not MINIMUM_ENV:
         TOP_CAMERA_X = 10
         TOP_CAMERA_Y = 10
     else:
         TOP_CAMERA_X = 2
         TOP_CAMERA_Y = 1
+    OBS_SIZE_X = TOP_CAMERA_X
+    OBS_SIZE_Y = TOP_CAMERA_Y + 1  # Extra column for sensors
+    IMAGE_MULTIPLIER = 8
     ALTITUDES = np.array([0, 1, 2, 3, 4])
     MAX_DRONE_ALTITUDE = 3
     HEADINGS = np.array([1, 2, 3, 4, 5, 6, 7, 8])
     NORMALISATION_FACTOR = 707.106781187
     drone = Drone()
     hiker = Hiker()
-    OBS_SIZE_X = TOP_CAMERA_X
-    OBS_SIZE_Y = TOP_CAMERA_Y + 1  # Extra column for sensors
-    IMAGE_MULTIPLIER = 8
     CHECK_ALTITUDE = True
     viewer = None
     viewer_ego = None
@@ -172,7 +172,7 @@ class AplEnv(gym.Env):
 
     def _get_hiker_random_pos(self):
         """ Returns random position of the hiker """
-        x_pos = rd.randint(200, 410)
+        x_pos = rd.randint(200, 310)
         y_pos = rd.randint(300, 350)
         #x_pos = rd.randint(0, self.X_MAX)
         #y_pos = rd.randint(0, self.X_MAX)
@@ -182,7 +182,7 @@ class AplEnv(gym.Env):
 
     def _get_drone_random_pos(self):
         """ Returns random values for initial positions """
-        x_pos = rd.randint(200, 410)
+        x_pos = rd.randint(200, 310)
         y_pos = rd.randint(300, 350)
         #x_pos = rd.randint(0, self.X_MAX)
         #y_pos = rd.randint(0, self.X_MAX)
@@ -248,18 +248,18 @@ class AplEnv(gym.Env):
             else, negative distance to the hiker """
         if not is_valid_pos:
             print("                 CRASH")
-            return -30.
+            return -1.
         if self._has_drone_arrived_hiker(self.drone.x, self.drone.y):
             print("DRONE MADE IT")
-            return 30.
+            return 1.
         approach = self._distance_to_hiker(self.drone.x_t_minus_1,
                                            self.drone.y_t_minus_1,
                                            normalise=True)\
             - self._distance_to_hiker(self.drone.x, self.drone.y,
                                       normalise=True)
         if approach > 0:
-            return .0
-        return -.5
+            return .1
+        return -.1
 
     def _get_observations(self, valid_drone_pos):
         obs = np.zeros((self.OBS_SIZE_X, self.OBS_SIZE_Y), dtype=np.float64)
