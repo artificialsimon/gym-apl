@@ -29,7 +29,7 @@ class AplEnv(gym.Env):
     X_MIN = 0
     Y_MAX = 499
     Y_MIN = 0
-    T_MAX = 200  # episode lenght. Not same as Config.TIME_MAX
+    T_MAX = 400  # episode lenght. Not same as Config.TIME_MAX
     if not MINIMUM_ENV:
         TOP_CAMERA_X = 10
         TOP_CAMERA_Y = 10
@@ -53,6 +53,7 @@ class AplEnv(gym.Env):
     hiker_trans = None
     observations = None
     number_step = 0
+    HIKER_SAMPLE_LEFT = True
 
     def __init__(self):
         self.action_space = spaces.Discrete(4)
@@ -172,8 +173,11 @@ class AplEnv(gym.Env):
 
     def _get_hiker_random_pos(self):
         """ Returns random position of the hiker """
-        x_pos = rd.randint(200, 310)
-        y_pos = rd.randint(300, 350)
+        if self.HIKER_SAMPLE_LEFT:
+            x_pos = rd.randint(240, 250)
+        else:
+            x_pos = rd.randint(395, 405)
+        y_pos = rd.randint(279, 479)
         #x_pos = rd.randint(0, self.X_MAX)
         #y_pos = rd.randint(0, self.X_MAX)
         #x_pos = 300
@@ -182,8 +186,12 @@ class AplEnv(gym.Env):
 
     def _get_drone_random_pos(self):
         """ Returns random values for initial positions """
-        x_pos = rd.randint(200, 310)
-        y_pos = rd.randint(300, 350)
+        if self.HIKER_SAMPLE_LEFT:
+            x_pos = rd.randint(240, 250)
+        else:
+            x_pos = rd.randint(395, 405)
+        self.HIKER_SAMPLE_LEFT = not self.HIKER_SAMPLE_LEFT
+        y_pos = rd.randint(279, 479)
         #x_pos = rd.randint(0, self.X_MAX)
         #y_pos = rd.randint(0, self.X_MAX)
         #x_pos = 235
