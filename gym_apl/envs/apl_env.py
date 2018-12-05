@@ -29,7 +29,7 @@ class AplEnv(gym.Env):
     X_MIN = 0
     Y_MAX = 499
     Y_MIN = 0
-    T_MAX = 200  # episode lenght. Not same as Config.TIME_MAX
+    T_MAX = 100  # episode lenght. Not same as Config.TIME_MAX
     if not MINIMUM_ENV:
         TOP_CAMERA_X = 10
         TOP_CAMERA_Y = 10
@@ -54,6 +54,10 @@ class AplEnv(gym.Env):
     observations = None
     number_step = 0
     HIKER_SAMPLE_LEFT = True
+    # Adding memory to aovid repetition of x, y
+    PENALISE_REPETITION = True
+    visited_position = set()
+    action = -2
 
     def __init__(self):
         self.action_space = spaces.Discrete(4)
@@ -110,6 +114,8 @@ class AplEnv(gym.Env):
         self.hiker.x, self.hiker.y = self._get_hiker_random_pos()
         while not self._is_valid_hiker_pos():
             self.hiker.x, self.hiker.y = self._get_hiker_random_pos()
+        self.visited_position.clear()
+        self.action = -2
         return self._get_observations(True)
 
     def render(self, mode='human', close=False):
@@ -182,7 +188,7 @@ class AplEnv(gym.Env):
         #y_pos = rd.randint(0, self.X_MAX)
         #y_pos = rd.randint(439, 469)
         y_pos = self.drone.y
-        x_pos = 310
+        x_pos = 309
         #y_pos = 400
         return x_pos, y_pos
 
@@ -208,7 +214,14 @@ class AplEnv(gym.Env):
                 self.drone.x > self.X_MAX or \
                 self.drone.y < self.Y_MIN or \
                 self.drone.y > self.Y_MAX:
+            print("                         OUTSIDE")
             return False
+        if self.PENALISE_REPETITION:
+            if self.action != -1:
+                if (self.drone.x, self.drone.y) in self.visited_position:
+                    print("                         TAILED")
+                    return False
+                self.visited_position.add((self.drone.x, self.drone.y))
         if not np.isin(self.drone.alt, self.ALTITUDES):
             return False
         if not np.isin(self.drone.head, self.HEADINGS):
@@ -218,6 +231,7 @@ class AplEnv(gym.Env):
         if self.CHECK_ALTITUDE:
             if self.drone.alt <= \
                self.full_altitude_map[self.drone.x][self.drone.y]:
+                print("                         CRASH")
                 return False
         return True
 
@@ -245,6 +259,7 @@ class AplEnv(gym.Env):
             next_y += -1
         if action == 3:
             next_x += -1
+        self.action = action
         return next_x, next_y, next_alt, next_head
 
     def _has_drone_arrived_hiker(self, x_pos, y_pos):
@@ -257,7 +272,6 @@ class AplEnv(gym.Env):
         """ If the drone is not on a valid position return negative reward,
             else, negative distance to the hiker """
         if not is_valid_pos:
-            print("                 CRASH")
             return -1.
         if self._has_drone_arrived_hiker(self.drone.x, self.drone.y):
             print("DRONE MADE IT")
@@ -300,6 +314,16 @@ class AplEnv(gym.Env):
             self.drone.x - self.hiker.x, self.X_MAX)
         obs[1][self.OBS_SIZE_Y - 1] = self._image_normalise_axis(
             self.drone.y - self.hiker.y, self.Y_MAX)
+        # Sensors for visited states around
+        if self.PENALISE_REPETITION:
+            if ((self.drone.x + 1, self.drone.y)) in self.visited_position:
+                obs[2][self.OBS_SIZE_Y - 1] = 255
+            if ((self.drone.x - 1, self.drone.y)) in self.visited_position:
+                obs[3][self.OBS_SIZE_Y - 1] = 255
+            if ((self.drone.x + 1, self.drone.y + 1)) in self.visited_position:
+                obs[4][self.OBS_SIZE_Y - 1] = 255
+            if ((self.drone.x, self.drone.y - 1)) in self.visited_position:
+                obs[5][self.OBS_SIZE_Y - 1] = 255
         # Distance from drone to hiker in [0,256)
         #obs[1][self.OBS_SIZE_Y - 1] = self._distance_to_hiker(self.drone.x, self.drone.y) * 255
         # Extending the size of the observation
