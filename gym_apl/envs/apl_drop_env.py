@@ -39,7 +39,7 @@ class PayloadStatus:
               "DAMAGED_STUCK", "DAMAGED_SUNK"]
 
 
-objects_code = {'mountain ridge': 0, 'trail': 1, 'shore bank': 2,
+OBJECTS_CODE = {'mountain ridge': 0, 'trail': 1, 'shore bank': 2,
                 'flight tower': 3, 'cabin': 4, 'stripped road': 5,
                 'solo tent': 6, 'runway': 7, 'white Jeep': 8,
                 'water': 9, 'pine trees': 10, 'bush': 11,
@@ -66,6 +66,7 @@ class AplDropEnv(gym.Env):
     HEADINGS = np.array([1, 2, 3, 4, 5, 6, 7, 8])
     NORMALISATION_FACTOR = math.sqrt(pow(TOP_CAMERA_X / 2, 2) +
                                      pow(TOP_CAMERA_Y / 2, 2))
+    IMAGE_MULTIPLIER = 8
     drone = Drone()
     hiker = Hiker()
     OBS_SIZE_X = TOP_CAMERA_X
@@ -73,10 +74,12 @@ class AplDropEnv(gym.Env):
     CHECK_ALTITUDE = False
     viewer_ego = None
     cells = None
-    observations = np.zeros((OBS_SIZE_X, OBS_SIZE_Y), dtype=np.uint8)
-    fix_map_around_hiker = np.zeros((OBS_SIZE_X, OBS_SIZE_Y), dtype=np.uint8)
+    observations = np.zeros((OBS_SIZE_X, OBS_SIZE_Y), dtype=np.float64)
+    obs_no_image = np.zeros((OBS_SIZE_X, OBS_SIZE_Y), dtype=np.float64)
+    fix_map_around_hiker = np.zeros((OBS_SIZE_X, OBS_SIZE_Y), dtype=np.float64)
     fix_alt_map_around_hiker = np.zeros((OBS_SIZE_X, OBS_SIZE_Y),
-                                        dtype=np.uint8)
+                                        dtype=np.float64)
+    normalised_map_around_hiker = None
     DROP_DISTANCE_FACTOR = 1.0
     number_step = 0
     # render
@@ -85,7 +88,7 @@ class AplDropEnv(gym.Env):
 
     def __init__(self):
         self.action_space = spaces.Discrete(5)
-        self.observation_space = spaces.Box(low=0, high=255, dtype=np.uint8,
+        self.observation_space = spaces.Box(low=0, high=255, dtype=np.float64,
                                             shape=(self.OBS_SIZE_X,
                                                    self.OBS_SIZE_Y))
         dirname = os.path.dirname(__file__)
@@ -138,6 +141,10 @@ class AplDropEnv(gym.Env):
                 self._get_drone_random_pos()
         self.fix_map_around_hiker = self._get_map_around(self.hiker.x_global,
                                                          self.hiker.y_global)
+        self.normalised_map_around_hiker = np.interp(
+            self.fix_map_around_hiker,
+            (min(OBJECTS_CODE.values()), max(OBJECTS_CODE.values())),
+            (0, 1)) * 255
         self.fix_alt_map_around_hiker = \
             self._get_alt_map_around(self.hiker.x_global,
                                      self.hiker.y_global)
@@ -172,10 +179,13 @@ class AplDropEnv(gym.Env):
             [[self.viewer_ego.add_geom(self.cells[y_cell][x_cell])
               for x_cell in range(self.OBS_SIZE_X)]
              for y_cell in range(self.OBS_SIZE_Y)]
-            [[self.cells[y_cell][x_cell].set_color(rd.random(), rd.random(),
-                                                   rd.random())
+            [[self.cells[y_cell][x_cell].set_color(self.obs_no_image[x_cell][y_cell] / 255,
+                                                  self.obs_no_image[x_cell][y_cell] / 255,
+                                                  self.obs_no_image[x_cell][y_cell] / 255)
               for x_cell in range(self.OBS_SIZE_X)]
              for y_cell in range(self.OBS_SIZE_Y)]
+            #np.set_printoptions(threshold=np.nan)
+            #print(self.obs_no_image)
             drone = rendering.FilledPolygon(
                 [(1, 1), (1, cell_width), (cell_width, int(cell_height / 2))])
             self.dronetrans = rendering.Transform()
@@ -214,37 +224,51 @@ class AplDropEnv(gym.Env):
         #return 1
 
     def _set_cells_color(self):
-        for width_cell in range(self.OBS_SIZE_Y):
-            for height_cell in range(self.OBS_SIZE_X):
-                if self.observations[height_cell][width_cell] == -1:
-                    color = (0.0, 0.0, 0.0)
-                elif self.observations[height_cell][width_cell] == 0:
-                    color = (0.0, 0.45, 0.14)
-                elif self.observations[height_cell][width_cell] == 1:
-                    color = (0.0, 0.72, 0.22)
-                elif self.observations[height_cell][width_cell] == 2:
-                    color = (0.0, 0.87, 0.27)
-                elif self.observations[height_cell][width_cell] == 3:
-                    color = (0.47, 0.99, 0.63)
-                elif self.observations[height_cell][width_cell] == 4:
-                    color = (0.65, 0.99, 0.76)
-                elif self.observations[height_cell][width_cell] == 5:
-                    color = (1.0, 0.0, 0.0)
-                elif self.observations[height_cell][width_cell] == 6:
-                    color = (1.0, 0.2, 0.2)
-                elif self.observations[height_cell][width_cell] == 7:
-                    color = (1.0, 0.5, 0.5)
-                elif self.observations[height_cell][width_cell] == 8:
-                    color = (1.0, 0.7, 0.7)
-                elif self.observations[height_cell][width_cell] == 255:
-                    color = (0.3, 0.7, 0.2)
-                else:
-                    color = (0.5, self.observations[height_cell][width_cell] / 18., 0.5)
-                self.cells[width_cell][height_cell].set_color(color[0],
-                                                              color[1],
-                                                              color[2])
+        #for width_cell in range(self.OBS_SIZE_Y):
+            #for height_cell in range(self.OBS_SIZE_X):
+                #if self.observations[height_cell][width_cell] == -1:
+                    #color = (0.0, 0.0, 0.0)
+                #elif self.observations[height_cell][width_cell] == 0:
+                    #color = (0.0, 0.45, 0.14)
+                #elif self.observations[height_cell][width_cell] == 1:
+                    #color = (0.0, 0.72, 0.22)
+                #elif self.observations[height_cell][width_cell] == 2:
+                    #color = (0.0, 0.87, 0.27)
+                #elif self.observations[height_cell][width_cell] == 3:
+                    #color = (0.47, 0.99, 0.63)
+                #elif self.observations[height_cell][width_cell] == 4:
+                    #color = (0.65, 0.99, 0.76)
+                #elif self.observations[height_cell][width_cell] == 5:
+                    #color = (1.0, 0.0, 0.0)
+                #elif self.observations[height_cell][width_cell] == 6:
+                    #color = (1.0, 0.2, 0.2)
+                #elif self.observations[height_cell][width_cell] == 7:
+                    #color = (1.0, 0.5, 0.5)
+                #elif self.observations[height_cell][width_cell] == 8:
+                    #color = (1.0, 0.7, 0.7)
+                #elif self.observations[height_cell][width_cell] == 255:
+                    #color = (0.3, 0.7, 0.2)
+                #else:
+                    #color = (0.5, self.observations[height_cell][width_cell] / 18., 0.5)
+                #self.cells[width_cell][height_cell].set_color(color[0],
+                                                              #color[1],
+                                                              #color[2])
+        self.cells[self.OBS_SIZE_Y - 1][0].set_color(
+            self.obs_no_image[0][self.OBS_SIZE_Y - 1] / 255,
+            self.obs_no_image[0][self.OBS_SIZE_Y - 1] / 255,
+            self.obs_no_image[0][self.OBS_SIZE_Y - 1] / 255)
         self.cells[self.OBS_SIZE_Y - 1][1].set_color(
-            0.0, 0.0, self.observations[1][self.OBS_SIZE_Y - 1] / 255)
+            self.obs_no_image[1][self.OBS_SIZE_Y - 1] / 255,
+            self.obs_no_image[1][self.OBS_SIZE_Y - 1] / 255,
+            self.obs_no_image[1][self.OBS_SIZE_Y - 1] / 255)
+        self.cells[self.OBS_SIZE_Y - 1][2].set_color(
+            self.obs_no_image[2][self.OBS_SIZE_Y - 1] / 255,
+            self.obs_no_image[2][self.OBS_SIZE_Y - 1] / 255,
+            self.obs_no_image[2][self.OBS_SIZE_Y - 1] / 255)
+        self.cells[self.OBS_SIZE_Y - 1][3].set_color(
+            self.obs_no_image[3][self.OBS_SIZE_Y - 1] / 255,
+            self.obs_no_image[3][self.OBS_SIZE_Y - 1] / 255,
+            self.obs_no_image[3][self.OBS_SIZE_Y - 1] / 255)
 
     def _get_drone_random_pos(self):
         """ Returns random values for initial positions inside view
@@ -318,42 +342,48 @@ class AplDropEnv(gym.Env):
         """
         return True, self.drone.x, self.drone.y, PayloadStatus.status[0]
 
-
     def _reward(self, is_valid_pos):
         """ If the drone is not on a valid position return negative reward,
             else, negative distance to the hiker """
         reward = .0
-        reward = 1. - self._distance_to_hiker(self.drone.payload_x,
-                                                self.drone.payload_y,
-                                                normalise=True)
+        #reward = 1. - self._distance_to_hiker(self.drone.payload_x,
+                                              #self.drone.payload_y,
+                                              #normalise=True)
         if not is_valid_pos:
             return -1.
         if self.drone.dropped:
             distance = 1. - self._distance_to_hiker(self.drone.payload_x,
                                                     self.drone.payload_y,
                                                     normalise=True)
-            # TODO reward based on payload status
-            #reward += distance
+             #TODO reward based on payload status
+            reward += distance
         return reward
 
     def _get_observations(self, valid_drone_pos):
-        obs = np.copy(self.fix_map_around_hiker)
+        obs = np.copy(self.normalised_map_around_hiker)
         if valid_drone_pos:
             # Drone altitude
-            obs[0, self.OBS_SIZE_Y - 1] = self.drone.alt
+            obs[0, self.OBS_SIZE_Y - 1] = self.drone.alt / \
+                self.ALTITUDES.max() * 255
             # Drone heading
-            obs[1, self.OBS_SIZE_Y - 1] = self.drone.head
+            obs[1, self.OBS_SIZE_Y - 1] = self.drone.head / \
+                self.HEADINGS.max() * 255
             # Drone relative x pos
-            obs[2, self.OBS_SIZE_Y - 1] = self.drone.x
+            obs[2, self.OBS_SIZE_Y - 1] = self.drone.x / self.TOP_CAMERA_X \
+                * 255
             # Drone relative y pos
-            obs[3, self.OBS_SIZE_Y - 1] = self.drone.y
+            obs[3, self.OBS_SIZE_Y - 1] = self.drone.y / self.TOP_CAMERA_Y \
+                * 255
+        self.obs_no_image = obs
+        obs = np.kron(obs, np.ones([self.IMAGE_MULTIPLIER,
+                                    self.IMAGE_MULTIPLIER]))
         return obs
 
     # TODO merge _get_alt_map_around with _get_map_around
     def _get_alt_map_around(self, x_pos, y_pos):
         """ returns the map around the x and y pos, with objects code """
         map_around = np.zeros((self.OBS_SIZE_X, self.OBS_SIZE_Y),
-                              dtype=np.uint8)
+                              dtype=np.float64)
         for x_cell in range(self.TOP_CAMERA_X):
             for y_cell in range(self.TOP_CAMERA_Y):
                 try:
@@ -365,11 +395,10 @@ class AplDropEnv(gym.Env):
                     map_around[x_cell][y_cell] = -1
         return map_around
 
-
     def _get_map_around(self, x_pos, y_pos):
         """ returns the map around the x and y pos, with objects code """
         map_around = np.zeros((self.OBS_SIZE_X, self.OBS_SIZE_Y),
-                              dtype=np.uint8)
+                              dtype=np.float64)
         for x_cell in range(self.TOP_CAMERA_X):
             for y_cell in range(self.TOP_CAMERA_Y):
                 try:
