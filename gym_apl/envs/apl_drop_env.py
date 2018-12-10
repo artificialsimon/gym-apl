@@ -145,6 +145,7 @@ class AplDropEnv(gym.Env):
             self.fix_map_around_hiker,
             (min(OBJECTS_CODE.values()), max(OBJECTS_CODE.values())),
             (0, 1)) * 255
+        self.rgb_map_around_hiker = self._to_rgb5(self.normalised_map_around_hiker)
         self.fix_alt_map_around_hiker = \
             self._get_alt_map_around(self.hiker.x_global,
                                      self.hiker.y_global)
@@ -162,63 +163,85 @@ class AplDropEnv(gym.Env):
         self.drone.dropped = False
         return self._get_observations(True)
 
-    def render(self, mode='human', close=False):
-        from gym.envs.classic_control import rendering
-        cell_width = 20
-        cell_height = 20
-        if self.viewer_ego is None:
-            self.viewer_ego = rendering.Viewer(self.OBS_SIZE_Y * cell_width,
-                                               self.OBS_SIZE_X * cell_height)
-            self.cells = [[rendering.FilledPolygon(
-                [(y_cell * cell_width, x_cell * cell_height),
-                 ((y_cell + 1) * cell_width, x_cell * cell_height),
-                 ((y_cell + 1) * cell_width, (x_cell + 1) * cell_height),
-                 (y_cell * cell_width, (x_cell + 1) * cell_width)])
-                           for x_cell in range(self.OBS_SIZE_X)]
-                          for y_cell in range(self.OBS_SIZE_Y)]
-            [[self.viewer_ego.add_geom(self.cells[y_cell][x_cell])
-              for x_cell in range(self.OBS_SIZE_X)]
-             for y_cell in range(self.OBS_SIZE_Y)]
-            [[self.cells[y_cell][x_cell].set_color(self.obs_no_image[x_cell][y_cell] / 255,
-                                                  self.obs_no_image[x_cell][y_cell] / 255,
-                                                  self.obs_no_image[x_cell][y_cell] / 255)
-              for x_cell in range(self.OBS_SIZE_X)]
-             for y_cell in range(self.OBS_SIZE_Y)]
-            #np.set_printoptions(threshold=np.nan)
-            #print(self.obs_no_image)
-            drone = rendering.FilledPolygon(
-                [(1, 1), (1, cell_width), (cell_width, int(cell_height / 2))])
-            self.dronetrans = rendering.Transform()
-            drone.add_attr(self.dronetrans)
-            self.viewer_ego.add_geom(drone)
-            self.dronetrans.set_translation(self.drone.x * cell_width,
-                                            self.drone.y * cell_height)
-            drone.set_color(.8, .6, .3)
-            payload = rendering.FilledPolygon(
-                [(3, 3), (3, cell_width * .75),
-                 (cell_height * .75, cell_height * .75),
-                 (cell_height * .75, 3)])
-            self.payload_trans = rendering.Transform()
-            payload.add_attr(self.payload_trans)
-            self.viewer_ego.add_geom(payload)
-            self.payload_trans.set_translation(-100, -100)
-            payload.set_color(.3, .3, .8)
-        self.dronetrans.set_translation(self.drone.x * cell_width,
-                                        self.drone.y * cell_height)
-        if self.drone.dropped:
-            #self.dronetrans.set_translation(1, 1)
-            self.payload_trans.set_translation(
-                (self.drone.payload_x) * cell_width,
-                self.drone.payload_y * cell_height)
-        if not self._is_valid_drone_pos():
-            self.dronetrans.set_translation(-100, -100)
+    #def render(self, mode='human', close=False):
+        #from gym.envs.classic_control import rendering
+        #cell_width = 20
+        #cell_height = 20
+        #if self.viewer_ego is None:
+            #self.viewer_ego = rendering.Viewer(self.OBS_SIZE_Y * cell_width,
+                                               #self.OBS_SIZE_X * cell_height)
+            #self.cells = [[rendering.FilledPolygon(
+                #[(y_cell * cell_width, x_cell * cell_height),
+                 #((y_cell + 1) * cell_width, x_cell * cell_height),
+                 #((y_cell + 1) * cell_width, (x_cell + 1) * cell_height),
+                 #(y_cell * cell_width, (x_cell + 1) * cell_width)])
+                           #for x_cell in range(self.OBS_SIZE_X)]
+                          #for y_cell in range(self.OBS_SIZE_Y)]
+            #[[self.viewer_ego.add_geom(self.cells[y_cell][x_cell])
+              #for x_cell in range(self.OBS_SIZE_X)]
+             #for y_cell in range(self.OBS_SIZE_Y)]
+            #[[self.cells[y_cell][x_cell].set_color(self.obs_no_image[x_cell][y_cell] / 255,
+                                                  #self.obs_no_image[x_cell][y_cell] / 255,
+                                                  #self.obs_no_image[x_cell][y_cell] / 255)
+              #for x_cell in range(self.OBS_SIZE_X)]
+             #for y_cell in range(self.OBS_SIZE_Y)]
+            ##np.set_printoptions(threshold=np.nan)
+            ##print(self.obs_no_image)
+            #drone = rendering.FilledPolygon(
+                #[(1, 1), (1, cell_width), (cell_width, int(cell_height / 2))])
+            #self.dronetrans = rendering.Transform()
+            #drone.add_attr(self.dronetrans)
+            #self.viewer_ego.add_geom(drone)
+            #self.dronetrans.set_translation(self.drone.x * cell_width,
+                                            #self.drone.y * cell_height)
+            #drone.set_color(.8, .6, .3)
+            #payload = rendering.FilledPolygon(
+                #[(3, 3), (3, cell_width * .75),
+                 #(cell_height * .75, cell_height * .75),
+                 #(cell_height * .75, 3)])
+            #self.payload_trans = rendering.Transform()
+            #payload.add_attr(self.payload_trans)
+            #self.viewer_ego.add_geom(payload)
+            #self.payload_trans.set_translation(-100, -100)
+            #payload.set_color(.3, .3, .8)
+        #self.dronetrans.set_translation(self.drone.x * cell_width,
+                                        #self.drone.y * cell_height)
+        #if self.drone.dropped:
+            ##self.dronetrans.set_translation(1, 1)
+            #self.payload_trans.set_translation(
+                #(self.drone.payload_x) * cell_width,
+                #self.drone.payload_y * cell_height)
+        #if not self._is_valid_drone_pos():
+            #self.dronetrans.set_translation(-100, -100)
 
-        self._set_cells_color()
-        time.sleep(0.09)
-        return self.viewer_ego.render(return_rgb_array=mode == 'rgb_array')
+        #self._set_cells_color()
+        #time.sleep(0.09)
+        #return self.viewer_ego.render(return_rgb_array=mode == 'rgb_array')
+
+    @staticmethod
+    def _to_rgb5(image):
+        image.resize((image.shape[0], image.shape[1], 1))
+        return np.repeat(image, 3, 2)
+
+    def render(self, mode='human'):
+        img = self.observations.astype(np.uint8)
+        #print(img.shape[0])
+        #print(img.shape[1])
+        #print(img.shape[2])
+        #exit(1)
+        if mode == 'rgb_array':
+            return img
+        elif mode == 'human':
+            from gym.envs.classic_control import rendering
+            if self.viewer_ego is None:
+                self.viewer_ego = rendering.SimpleImageViewer()
+            self.viewer_ego.imshow(img)
+            return self.viewer_ego.isopen
+
 
     def _reset_viewer(self):
-        self.payload_trans.set_translation(-100, -100)
+        #self.payload_trans.set_translation(-100, -100)
+        return 1
 
     #def seed(self, seed=None):
         #return 1
@@ -360,23 +383,35 @@ class AplDropEnv(gym.Env):
         return reward
 
     def _get_observations(self, valid_drone_pos):
-        obs = np.copy(self.normalised_map_around_hiker)
+        obs = np.copy(self.rgb_map_around_hiker)
         if valid_drone_pos:
             # Drone altitude
-            obs[0, self.OBS_SIZE_Y - 1] = self.drone.alt / \
+            obs[0, self.OBS_SIZE_Y - 1, :] = self.drone.alt / \
                 self.ALTITUDES.max() * 255
             # Drone heading
-            obs[1, self.OBS_SIZE_Y - 1] = self.drone.head / \
+            obs[1, self.OBS_SIZE_Y - 1, :] = self.drone.head / \
                 self.HEADINGS.max() * 255
             # Drone relative x pos
-            obs[2, self.OBS_SIZE_Y - 1] = self.drone.x / self.TOP_CAMERA_X \
+            obs[2, self.OBS_SIZE_Y - 1, :] = self.drone.x / self.TOP_CAMERA_X \
                 * 255
             # Drone relative y pos
-            obs[3, self.OBS_SIZE_Y - 1] = self.drone.y / self.TOP_CAMERA_Y \
+            obs[3, self.OBS_SIZE_Y - 1, :] = self.drone.y / self.TOP_CAMERA_Y \
                 * 255
+            # Drone
+            obs[self.drone.x, self.drone.y, :] = 55
+            if self.drone.dropped:
+                obs[self.drone.payload_x, self.drone.payload_y, :] = 155
+
         self.obs_no_image = obs
         obs = np.kron(obs, np.ones([self.IMAGE_MULTIPLIER,
-                                    self.IMAGE_MULTIPLIER]))
+                                    self.IMAGE_MULTIPLIER, 1]))
+        #print(obs.shape)
+        #exit(1)
+        #from matplotlib import pyplot as PLT
+        #PLT.imshow(obs.astype(np.uint8))
+        #PLT.show()
+        #print(obs)
+        #exit(1)
         return obs
 
     # TODO merge _get_alt_map_around with _get_map_around
