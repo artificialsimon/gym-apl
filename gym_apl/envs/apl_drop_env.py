@@ -116,6 +116,10 @@ class AplDropEnv(gym.Env):
         if not valid_drone_pos or self.drone.dropped or \
            self.number_step == 50:
             done = True
+        # TODO test delete:
+        if self._distance_to_hiker(self.drone.payload_x,
+                                   self.drone.payload_y, normalise=False) == 0:
+            done = True
         self.observations = self._get_observations(valid_drone_pos)
         reward = self._reward(valid_drone_pos)
         info = {}
@@ -380,6 +384,12 @@ class AplDropEnv(gym.Env):
                                                     normalise=True)
              #TODO reward based on payload status
             reward += distance
+        #testing
+        reward = 1. - self._distance_to_hiker(self.drone.payload_x,
+                                              self.drone.payload_y,
+                                              normalise=True)
+        if reward == 1.:
+            reward = 10.
         return reward
 
     def _get_observations(self, valid_drone_pos):
