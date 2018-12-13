@@ -384,12 +384,8 @@ class AplDropEnv(gym.Env):
                                                     normalise=True)
              #TODO reward based on payload status
             reward += distance
-        #testing
-        reward = 1. - self._distance_to_hiker(self.drone.payload_x,
-                                              self.drone.payload_y,
-                                              normalise=True)
-        if reward == 1.:
-            reward = 10.
+            if reward == 1.:
+                reward = 10.
         return reward
 
     def _get_observations(self, valid_drone_pos):
