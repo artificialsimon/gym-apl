@@ -367,6 +367,8 @@ class AplDropEnv(gym.Env):
             # TODO dropping also advance drone one step forward
             self.drone.payload_x = self.drone.x
             self.drone.payload_y = self.drone.y
+            #from pprint import pprint
+            #pprint(vars(self.drone))
         return next_x, next_y, next_alt, next_head
 
     def drop_payload(self):
@@ -389,9 +391,9 @@ class AplDropEnv(gym.Env):
             distance = self._distance_to_hiker(self.drone.payload_x,
                                                self.drone.payload_y,
                                                normalise=True)
-            reward = (1. - distance + 4 - self.drone.alt) * (4 - self.drone.alt)
-            if distance == 0 and self.drone.alt == 1:
-                reward = 15.
+            reward = 10. * (1. - distance + 4 - self.drone.alt) * (4 - self.drone.alt)
+            #if distance == 0 and self.drone.alt == 1:
+                #reward = 150.
         return reward
 
     def _get_observations(self, valid_drone_pos):
