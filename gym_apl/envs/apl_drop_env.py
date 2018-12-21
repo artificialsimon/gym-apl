@@ -6,6 +6,8 @@ import numpy as np
 import random as rd
 from gym import error, spaces, utils
 from gym.utils import seeding
+#from skimage.draw import circle_perimeter
+import skimage.draw as draw
 
 
 class Drone(object):
@@ -38,6 +40,9 @@ class PayloadStatus:
     status = ["OK", "OK_STUCK", "OK_SUNK", "DAMAGED",
               "DAMAGED_STUCK", "DAMAGED_SUNK"]
 
+COLOUR_LEVEL = [(0, 0, 0), (10, 10, 10), (20, 20, 20), (30, 30, 30)]
+DRONE_COLOUR = [178, 34, 34]
+HIKER_COLOUR = [0, 0, 255]
 
 OBJECTS_CODE = {'mountain ridge': 0, 'trail': 1, 'shore bank': 2,
                 'flight tower': 3, 'cabin': 4, 'stripped road': 5,
@@ -65,12 +70,13 @@ class AplDropEnv(gym.Env):
     MAX_DRONE_ALTITUDE = 3
     HEADINGS = np.array([1, 2, 3, 4, 5, 6, 7, 8])
     NORMALISATION_FACTOR = math.sqrt(pow(TOP_CAMERA_X / 2, 2) +
-                                     pow(TOP_CAMERA_Y / 2, 2))
+                                     pow(TOP_CAMERA_Y / 2, 2) +
+                                     pow(max(ALTITUDES), 2))
     IMAGE_MULTIPLIER = 8
     drone = Drone()
     hiker = Hiker()
     OBS_SIZE_X = TOP_CAMERA_X
-    OBS_SIZE_Y = TOP_CAMERA_Y + 1  # Extra column for sensors
+    OBS_SIZE_Y = TOP_CAMERA_Y  # + 1  # Extra column for sensors
     CHECK_ALTITUDE = False
     viewer_ego = None
     cells = None
@@ -118,7 +124,8 @@ class AplDropEnv(gym.Env):
             done = True
         # TODO test delete:
         if self._distance_to_hiker(self.drone.payload_x,
-                                   self.drone.payload_y, normalise=False) == 0:
+                                   self.drone.payload_y, self.drone.alt,
+                                   normalise=False) == 0:
             done = True
         self.observations = self._get_observations(valid_drone_pos)
         reward = self._reward(valid_drone_pos)
@@ -233,6 +240,7 @@ class AplDropEnv(gym.Env):
         #print(img.shape[1])
         #print(img.shape[2])
         #exit(1)
+        time.sleep(0.1)
         if mode == 'rgb_array':
             return img
         elif mode == 'human':
@@ -381,46 +389,57 @@ class AplDropEnv(gym.Env):
         """ If the drone is not on a valid position return negative reward,
             else, negative distance to the hiker """
         reward = .0
-        #reward = 1. - self._distance_to_hiker(self.drone.payload_x,
-                                              #self.drone.payload_y,
-                                              #normalise=True)
+        distance = self._distance_to_hiker(self.drone.payload_x,
+                                              self.drone.payload_y,
+                                              self.drone.alt,
+                                              normalise=True)
         if not is_valid_pos:
             return -1.
-        if self.drone.dropped:
-            # TODO reward based on payload status
-            distance = self._distance_to_hiker(self.drone.payload_x,
-                                               self.drone.payload_y,
-                                               normalise=True)
-            reward = 10. * (1. - distance + 4 - self.drone.alt) * (4 - self.drone.alt)
-            #if distance == 0 and self.drone.alt == 1:
-                #reward = 150.
+        #if self.drone.dropped:
+            ## TODO reward based on payload status
+            #distance = self._distance_to_hiker(self.drone.payload_x,
+                                               #self.drone.payload_y,
+                                               #normalise=True)
+            #reward += 10. * (1. - distance + 4 - self.drone.alt) * (4 - self.drone.alt)
+        if distance == 0:
+            reward = 10.
+        else:
+            reward = 1. - distance
         return reward
 
     def _get_observations(self, valid_drone_pos):
         obs = np.copy(self.rgb_map_around_hiker)
-        if valid_drone_pos:
-            # Drone altitude
-            obs[0, self.OBS_SIZE_Y - 1, :] = self.drone.alt / \
-                self.ALTITUDES.max() * 255
-            # Drone heading
-            obs[1, self.OBS_SIZE_Y - 1, :] = self.drone.head / \
-                self.HEADINGS.max() * 255
-            # Drone relative x pos
-            obs[2, self.OBS_SIZE_Y - 1, :] = self.drone.x / self.TOP_CAMERA_X \
-                * 255
-            # Drone relative y pos
-            obs[3, self.OBS_SIZE_Y - 1, :] = self.drone.y / self.TOP_CAMERA_Y \
-                * 255
-            # Drone
-            obs[self.drone.x, self.drone.y, :] = 55
-            if self.drone.dropped:
-                obs[self.drone.payload_x, self.drone.payload_y, :] = 155
+        #if valid_drone_pos:
+            ## Drone altitude
+            #obs[0, self.OBS_SIZE_Y - 1, 0] = self.drone.alt / \
+                #self.ALTITUDES.max() * 255
+            #obs[0, self.OBS_SIZE_Y - 1, 1] = self.drone.alt / \
+                #self.ALTITUDES.max() * 155
+            #obs[0, self.OBS_SIZE_Y - 1, 2] = self.drone.alt / \
+                #self.ALTITUDES.max() * 55
+            ## Drone heading
+            #obs[1, self.OBS_SIZE_Y - 1, :] = self.drone.head / \
+                #self.HEADINGS.max() * 255
+            ## Drone relative x pos
+            #obs[2, self.OBS_SIZE_Y - 1, :] = self.drone.x / self.TOP_CAMERA_X \
+                #* 255
+            ## Drone relative y pos
+            #obs[3, self.OBS_SIZE_Y - 1, :] = self.drone.y / self.TOP_CAMERA_Y \
+                #* 255
 
-        self.obs_no_image = obs
         obs = np.kron(obs, np.ones([self.IMAGE_MULTIPLIER,
                                     self.IMAGE_MULTIPLIER, 1]))
+        if valid_drone_pos:
+            # draw drone
+            rr, cc = draw.circle_perimeter(np.uint8((self.drone.x + 0.5) * self.IMAGE_MULTIPLIER), np.uint8((self.drone.y + 0.5) * self.IMAGE_MULTIPLIER), np.uint8(self.IMAGE_MULTIPLIER / 7.5 * self.drone.alt))
+            draw.set_color(obs, (rr, cc), DRONE_COLOUR)
+            # draw hiker as an x
+            rr, cc = draw.line(np.uint8(self.hiker.x_local * self.IMAGE_MULTIPLIER), np.uint8(self.hiker.y_local * self.IMAGE_MULTIPLIER), np.uint8((self.hiker.x_local + 1) * self.IMAGE_MULTIPLIER), np.uint8((self.hiker.y_local + 1) * self.IMAGE_MULTIPLIER))
+            draw.set_color(obs, (rr, cc), HIKER_COLOUR)
+            rr, cc = draw.line(np.uint8((self.hiker.x_local + 1) * self.IMAGE_MULTIPLIER), np.uint8(self.hiker.y_local * self.IMAGE_MULTIPLIER), np.uint8(self.hiker.x_local * self.IMAGE_MULTIPLIER), np.uint8((self.hiker.y_local + 1) * self.IMAGE_MULTIPLIER))
+            draw.set_color(obs, (rr, cc), HIKER_COLOUR)
+
         #print(obs.shape)
-        #exit(1)
         #from matplotlib import pyplot as PLT
         #PLT.imshow(obs.astype(np.uint8))
         #PLT.show()
@@ -459,9 +478,10 @@ class AplDropEnv(gym.Env):
                     map_around[x_cell][y_cell] = -1
         return map_around
 
-    def _distance_to_hiker(self, pos_x, pos_y, normalise=True):
+    def _distance_to_hiker(self, pos_x, pos_y, alt, normalise=True):
         dist = math.sqrt(pow(self.HIKER_RELATIVE_POS - pos_x, 2) +
-                         pow(self.HIKER_RELATIVE_POS - pos_y, 2))
+                         pow(self.HIKER_RELATIVE_POS - pos_y, 2) +
+                         pow(self.hiker.alt - alt, 2))
         if normalise:
             dist = dist / self.NORMALISATION_FACTOR
         return dist
