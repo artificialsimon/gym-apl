@@ -30,20 +30,20 @@ class Hiker(object):
     required_payload = {}
 
 
-
 class Payload:
     """Drone payloads type"""
     payloads = ["EMPTY", "food", "medicine", "communications"]
+
 
 class PayloadStatus:
     """Drone payloads type"""
     status = ["OK", "OK_STUCK", "OK_SUNK", "DAMAGED",
               "DAMAGED_STUCK", "DAMAGED_SUNK"]
 
+
 COLOUR_LEVEL = [(0, 0, 0), (10, 10, 10), (20, 20, 20), (30, 30, 30)]
 DRONE_COLOUR = [178, 34, 34]
 HIKER_COLOUR = [0, 0, 255]
-
 OBJECTS_CODE = {'mountain ridge': 0, 'trail': 1, 'shore bank': 2,
                 'flight tower': 3, 'cabin': 4, 'stripped road': 5,
                 'solo tent': 6, 'runway': 7, 'white Jeep': 8,
@@ -53,6 +53,7 @@ OBJECTS_CODE = {'mountain ridge': 0, 'trail': 1, 'shore bank': 2,
                 'blue Jeep': 17, 'grass': 18, 'family tent': 19,
                 'small hill': 20, 'box canyon': 21,
                 'inactive campfire ring': 22, 'large hill': 23}
+
 
 class AplDropEnv(gym.Env):
     """ Class for simplified and fast APL on openAI gym interface for dropping
@@ -77,14 +78,14 @@ class AplDropEnv(gym.Env):
     hiker = Hiker()
     OBS_SIZE_X = TOP_CAMERA_X
     OBS_SIZE_Y = TOP_CAMERA_Y  # + 1  # Extra column for sensors
-    CHECK_ALTITUDE = False
+    CHECK_ALTITUDE = True
     viewer_ego = None
     cells = None
-    observations = np.zeros((OBS_SIZE_X, OBS_SIZE_Y), dtype=np.float64)
-    obs_no_image = np.zeros((OBS_SIZE_X, OBS_SIZE_Y), dtype=np.float64)
-    fix_map_around_hiker = np.zeros((OBS_SIZE_X, OBS_SIZE_Y), dtype=np.float64)
+    observations = np.zeros((OBS_SIZE_X, OBS_SIZE_Y), dtype=np.float32)
+    obs_no_image = np.zeros((OBS_SIZE_X, OBS_SIZE_Y), dtype=np.float32)
+    fix_map_around_hiker = np.zeros((OBS_SIZE_X, OBS_SIZE_Y), dtype=np.float32)
     fix_alt_map_around_hiker = np.zeros((OBS_SIZE_X, OBS_SIZE_Y),
-                                        dtype=np.float64)
+                                        dtype=np.float32)
     normalised_map_around_hiker = None
     DROP_DISTANCE_FACTOR = 1.0
     number_step = 0
@@ -94,7 +95,7 @@ class AplDropEnv(gym.Env):
 
     def __init__(self):
         self.action_space = spaces.Discrete(6)
-        self.observation_space = spaces.Box(low=0, high=255, dtype=np.float64,
+        self.observation_space = spaces.Box(low=0, high=255, dtype=np.float32,
                                             shape=(self.OBS_SIZE_X,
                                                    self.OBS_SIZE_Y))
         dirname = os.path.dirname(__file__)
@@ -340,8 +341,8 @@ class AplDropEnv(gym.Env):
                            self.X_MAX - self.HIKER_RELATIVE_POS - 1)
         y_pos = rd.randint(self.Y_MIN + self.HIKER_RELATIVE_POS + 1,
                            self.Y_MAX - self.HIKER_RELATIVE_POS - 1)
-        x_pos = 300
-        y_pos = 300
+        #x_pos = 300
+        #y_pos = 300
         return x_pos, y_pos, self.HIKER_RELATIVE_POS, self.HIKER_RELATIVE_POS,\
             self.full_altitude_map[x_pos, y_pos]
 
@@ -389,22 +390,23 @@ class AplDropEnv(gym.Env):
         """ If the drone is not on a valid position return negative reward,
             else, negative distance to the hiker """
         reward = .0
-        distance = self._distance_to_hiker(self.drone.payload_x,
-                                              self.drone.payload_y,
-                                              self.drone.alt,
-                                              normalise=True)
         if not is_valid_pos:
             return -1.
-        #if self.drone.dropped:
-            ## TODO reward based on payload status
-            #distance = self._distance_to_hiker(self.drone.payload_x,
-                                               #self.drone.payload_y,
-                                               #normalise=True)
+        #distance = self._distance_to_hiker(self.drone.payload_x,
+                                           #self.drone.payload_y,
+                                           #self.drone.alt,
+                                           #normalise=True)
+        if self.drone.dropped:
+            # TODO reward based on payload status
+            distance = self._distance_to_hiker(self.drone.payload_x,
+                                               self.drone.payload_y,
+                                               self.drone.alt,
+                                               normalise=True)
             #reward += 10. * (1. - distance + 4 - self.drone.alt) * (4 - self.drone.alt)
-        if distance == 0:
-            reward = 10.
-        else:
-            reward = 1. - distance
+            if distance == 0:
+                reward = 10.
+            else:
+                reward = 1. - distance
         return reward
 
     def _get_observations(self, valid_drone_pos):
@@ -451,7 +453,7 @@ class AplDropEnv(gym.Env):
     def _get_alt_map_around(self, x_pos, y_pos):
         """ returns the map around the x and y pos, with objects code """
         map_around = np.zeros((self.OBS_SIZE_X, self.OBS_SIZE_Y),
-                              dtype=np.float64)
+                              dtype=np.float32)
         for x_cell in range(self.TOP_CAMERA_X):
             for y_cell in range(self.TOP_CAMERA_Y):
                 try:
@@ -466,7 +468,7 @@ class AplDropEnv(gym.Env):
     def _get_map_around(self, x_pos, y_pos):
         """ returns the map around the x and y pos, with objects code """
         map_around = np.zeros((self.OBS_SIZE_X, self.OBS_SIZE_Y),
-                              dtype=np.float64)
+                              dtype=np.float32)
         for x_cell in range(self.TOP_CAMERA_X):
             for y_cell in range(self.TOP_CAMERA_Y):
                 try:
