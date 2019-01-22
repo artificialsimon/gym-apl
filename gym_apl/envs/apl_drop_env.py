@@ -77,7 +77,7 @@ class AplDropEnv(gym.Env):
     hiker = Hiker()
     OBS_SIZE_X = TOP_CAMERA_X
     OBS_SIZE_Y = TOP_CAMERA_Y  # + 1  # Extra column for sensors
-    CHECK_ALTITUDE = True
+    CHECK_ALTITUDE = False
     viewer_ego = None
     cells = None
     observations = np.zeros((OBS_SIZE_X, OBS_SIZE_Y), dtype=np.float32)
@@ -123,9 +123,10 @@ class AplDropEnv(gym.Env):
            self.number_step == 20:
             done = True
         # TODO test delete:
-        if self._distance_to_hiker(self.drone.payload_x,
-                                   self.drone.payload_y, self.drone.alt,
+        if self._distance_to_hiker(self.drone.x,
+                                   self.drone.y, self.drone.alt - 1,
                                    normalise=False) == 0:
+            #print("LLEGUÉ ARRIBA HIKER")
             done = True
         self.observations = self._get_observations(valid_drone_pos)
         if action == -1:  # intialisation
@@ -326,14 +327,18 @@ class AplDropEnv(gym.Env):
                 self.drone.x >= self.TOP_CAMERA_X or \
                 self.drone.y < 0 or \
                 self.drone.y >= self.TOP_CAMERA_Y:
+            #print("fuera")
             return False
         if self.drone.alt > self.MAX_DRONE_ALTITUDE:
+            #print("arriba")
             return False
-        if self.drone.alt < self.ALTITUDES.min():
+        if self.drone.alt <= self.ALTITUDES.min():
+            #print("choco piso")
             return False
         if self.CHECK_ALTITUDE:
             if self.drone.alt <= self.fix_alt_map_around_hiker[self.drone.x,
                                                                self.drone.y]:
+                #print("hit something")
                 return False
         return True
 
@@ -345,6 +350,7 @@ class AplDropEnv(gym.Env):
                            self.Y_MAX - self.HIKER_RELATIVE_POS - 1)
         x_pos = 300
         y_pos = 300
+        np.set_printoptions(threshold=np.nan)
         return x_pos, y_pos, self.HIKER_RELATIVE_POS, self.HIKER_RELATIVE_POS,\
             self.full_altitude_map[x_pos, y_pos]
 
@@ -396,7 +402,7 @@ class AplDropEnv(gym.Env):
             return -1.
         distance = self._distance_to_hiker(self.drone.x,
                                            self.drone.y,
-                                           self.drone.alt,
+                                           self.drone.alt - 1,
                                            normalise=True)
         if distance == 0:
             reward = 10.
