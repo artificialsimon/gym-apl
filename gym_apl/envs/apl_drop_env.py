@@ -349,8 +349,8 @@ class AplDropEnv(gym.Env):
                            self.X_MAX - self.HIKER_RELATIVE_POS - 1)
         y_pos = rd.randint(self.Y_MIN + self.HIKER_RELATIVE_POS + 1,
                            self.Y_MAX - self.HIKER_RELATIVE_POS - 1)
-        #x_pos = 300
-        #y_pos = 300
+        x_pos = 300
+        y_pos = 300
         np.set_printoptions(threshold=np.nan)
         return x_pos, y_pos, self.HIKER_RELATIVE_POS, self.HIKER_RELATIVE_POS,\
             self.full_altitude_map[x_pos, y_pos]
