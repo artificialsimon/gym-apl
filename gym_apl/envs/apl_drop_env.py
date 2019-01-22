@@ -67,8 +67,7 @@ class AplDropEnv(gym.Env):
     TOP_CAMERA_X = HIKER_RELATIVE_POS * 2 + 1
     TOP_CAMERA_Y = HIKER_RELATIVE_POS * 2 + 1
     ALTITUDES = np.array([0, 1, 2, 3, 4])
-    # TODO check in real APL for max drone alt
-    MAX_DRONE_ALTITUDE = 3
+    MAX_DRONE_ALTITUDE = ALTITUDES.max()
     HEADINGS = np.array([1, 2, 3, 4, 5, 6, 7, 8])
     NORMALISATION_FACTOR = math.sqrt(pow(TOP_CAMERA_X / 2, 2) +
                                      pow(TOP_CAMERA_Y / 2, 2) +
@@ -129,9 +128,12 @@ class AplDropEnv(gym.Env):
                                    normalise=False) == 0:
             done = True
         self.observations = self._get_observations(valid_drone_pos)
-        reward = self._reward(valid_drone_pos)
+        if action == -1:  # intialisation
+            reward = .0
+        else:
+            reward = self._reward(valid_drone_pos)
         info = {}
-        #print(action, reward, self.observations)
+        #print(action, reward) #, self.observations)
         return self.observations, reward, done, info
 
     def reset(self):
@@ -327,7 +329,7 @@ class AplDropEnv(gym.Env):
             return False
         if self.drone.alt > self.MAX_DRONE_ALTITUDE:
             return False
-        if self.drone.alt <= 0:
+        if self.drone.alt < self.ALTITUDES.min():
             return False
         if self.CHECK_ALTITUDE:
             if self.drone.alt <= self.fix_alt_map_around_hiker[self.drone.x,
@@ -392,8 +394,8 @@ class AplDropEnv(gym.Env):
         reward = .0
         if not is_valid_pos:
             return -1.
-        distance = self._distance_to_hiker(self.drone.payload_x,
-                                           self.drone.payload_y,
+        distance = self._distance_to_hiker(self.drone.x,
+                                           self.drone.y,
                                            self.drone.alt,
                                            normalise=True)
         if distance == 0:
