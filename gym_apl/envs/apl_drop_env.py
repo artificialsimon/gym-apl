@@ -154,11 +154,12 @@ class AplDropEnv(gym.Env):
         while not self._is_valid_drone_pos():
             self.drone.x, self.drone.y, self.drone.alt, self.drone.head = \
                 self._get_drone_random_pos()
-        self.fix_map_around_hiker = self._get_map_around(self.hiker.x_global,
-                                                         self.hiker.y_global)
-        self.normalised_map_around_hiker = np.interp(
+        # building the altitude fix map
+        self.fix_map_around_hiker = self._get_alt_map_around(
+            self.hiker.x_global, self.hiker.y_global)
+        self.normalised_map_around_hiker = 255 - np.interp(
             self.fix_map_around_hiker,
-            (min(OBJECTS_CODE.values()), max(OBJECTS_CODE.values())),
+            (min(self.ALTITUDES), max(self.ALTITUDES)),
             (0, 1)) * 255
         self.rgb_map_around_hiker = self._to_rgb5(self.normalised_map_around_hiker)
         self.fix_alt_map_around_hiker = \
@@ -348,8 +349,8 @@ class AplDropEnv(gym.Env):
                            self.X_MAX - self.HIKER_RELATIVE_POS - 1)
         y_pos = rd.randint(self.Y_MIN + self.HIKER_RELATIVE_POS + 1,
                            self.Y_MAX - self.HIKER_RELATIVE_POS - 1)
-        x_pos = 300
-        y_pos = 300
+        #x_pos = 300
+        #y_pos = 300
         np.set_printoptions(threshold=np.nan)
         return x_pos, y_pos, self.HIKER_RELATIVE_POS, self.HIKER_RELATIVE_POS,\
             self.full_altitude_map[x_pos, y_pos]
@@ -357,7 +358,7 @@ class AplDropEnv(gym.Env):
     def _is_valid_hiker_pos(self):
         """ validate hikers initial position """
         # if self.hiker.alt >= self.MAX_DRONE_ALTITUDE - 1:
-        if self.hiker.alt > 1:
+        if self.hiker.alt > 0:
             return False
         return True
 
@@ -482,15 +483,15 @@ class AplDropEnv(gym.Env):
 
     # TODO merge _get_alt_map_around with _get_map_around
     def _get_alt_map_around(self, x_pos, y_pos):
-        """ returns the map around the x and y pos, with objects code """
+        """ returns the map around the x and y pos, with objects altitude """
         map_around = np.zeros((self.OBS_SIZE_X, self.OBS_SIZE_Y),
                               dtype=np.float32)
         for x_cell in range(self.TOP_CAMERA_X):
             for y_cell in range(self.TOP_CAMERA_Y):
                 try:
                     alt = self.full_altitude_map[
-                        int(x_pos - self.TOP_CAMERA_X / 2 + x_cell)][
-                            int(y_pos - self.TOP_CAMERA_Y / 2 + y_cell)]
+                        int(x_pos - self.TOP_CAMERA_X / 2 + x_cell) + 1][
+                            int(y_pos - self.TOP_CAMERA_Y / 2 + y_cell) + 1]
                     map_around[x_cell][y_cell] = alt
                 except IndexError:
                     map_around[x_cell][y_cell] = -1
