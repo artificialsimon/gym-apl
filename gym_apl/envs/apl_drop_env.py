@@ -77,7 +77,7 @@ class AplDropEnv(gym.Env):
     hiker = Hiker()
     OBS_SIZE_X = TOP_CAMERA_X
     OBS_SIZE_Y = TOP_CAMERA_Y  # + 1  # Extra column for sensors
-    CHECK_ALTITUDE = False
+    CHECK_ALTITUDE = True
     viewer_ego = None
     cells = None
     observations = np.zeros((OBS_SIZE_X, OBS_SIZE_Y), dtype=np.float32)
@@ -93,7 +93,7 @@ class AplDropEnv(gym.Env):
     payload_trans = None
 
     def __init__(self):
-        self.action_space = spaces.Discrete(5)
+        self.action_space = spaces.Discrete(6)
         self.observation_space = spaces.Box(low=0, high=255, dtype=np.float32,
                                             shape=(self.OBS_SIZE_X,
                                                    self.OBS_SIZE_Y))
@@ -122,12 +122,10 @@ class AplDropEnv(gym.Env):
         if not valid_drone_pos or self.drone.dropped or \
            self.number_step == 20:
             done = True
-        # TODO test delete:
-        if self._distance_to_hiker(self.drone.x,
-                                   self.drone.y, self.drone.alt - 1,
-                                   normalise=False) == 0:
-            #print("LLEGUÉ ARRIBA HIKER")
-            done = True
+        #if self._distance_to_hiker(self.drone.x,
+                                   #self.drone.y, self.drone.alt - 1,
+                                   #normalise=False) == 0:
+            #done = True
         self.observations = self._get_observations(valid_drone_pos)
         if action == -1:  # intialisation
             reward = .0
@@ -148,12 +146,6 @@ class AplDropEnv(gym.Env):
             self.hiker.x_global, self.hiker.y_global, \
                 self.hiker.x_local, self.hiker.y_local, \
                 self.hiker.alt = self._get_hiker_random_pos()
-        # Random drone position
-        self.drone.x, self.drone.y, self.drone.alt, self.drone.head = \
-            self._get_drone_random_pos()
-        while not self._is_valid_drone_pos():
-            self.drone.x, self.drone.y, self.drone.alt, self.drone.head = \
-                self._get_drone_random_pos()
         # building the altitude fix map
         self.fix_map_around_hiker = self._get_alt_map_around(
             self.hiker.x_global, self.hiker.y_global)
@@ -165,6 +157,12 @@ class AplDropEnv(gym.Env):
         self.fix_alt_map_around_hiker = \
             self._get_alt_map_around(self.hiker.x_global,
                                      self.hiker.y_global)
+        # Random drone position
+        self.drone.x, self.drone.y, self.drone.alt, self.drone.head = \
+            self._get_drone_random_pos()
+        while not self._is_valid_drone_pos():
+            self.drone.x, self.drone.y, self.drone.alt, self.drone.head = \
+                self._get_drone_random_pos()
         self.drone.payload_x = 0
         self.drone.payload_y = 0
         self.drone.payload_status = None
@@ -316,9 +314,9 @@ class AplDropEnv(gym.Env):
         """ Returns random values for initial positions inside view
             relative to hiker pos
         """
-        x_pos = rd.randint(0, self.TOP_CAMERA_X)
-        y_pos = rd.randint(0, self.TOP_CAMERA_Y)
-        alt = 3  # np.random.choice(self.ALTITUDES)
+        x_pos = rd.randint(0, self.TOP_CAMERA_X - 1)
+        y_pos = rd.randint(0, self.TOP_CAMERA_Y - 1)
+        alt = 3  # self.fix_map_around_hiker[x_pos, y_pos] + 1
         head = np.random.choice(self.HEADINGS)
         return x_pos, y_pos, alt, head
 
@@ -377,16 +375,10 @@ class AplDropEnv(gym.Env):
         if action == 3:
             next_x += -1
         if action == 4:
-            next_alt -= 1
-        #if action == 5:
-            #self.drone.dropped, self.drone.payload_x, self.drone.payload_y, \
-                #self.drone.payload_status = self.drop_payload()
-            ## TODO apl dynamics for dropping final place
-            ## TODO dropping also advance drone one step forward
-            #self.drone.payload_x = self.drone.x
-            #self.drone.payload_y = self.drone.y
-            ##from pprint import pprint
-            ##pprint(vars(self.drone))
+            next_alt += -1
+        if action == 5:
+            self.drone.dropped, self.drone.payload_x, self.drone.payload_y, \
+                self.drone.payload_status = self.drop_payload()
         return next_x, next_y, next_alt, next_head
 
     def drop_payload(self):
@@ -405,21 +397,26 @@ class AplDropEnv(gym.Env):
                                            self.drone.y,
                                            self.drone.alt - 1,
                                            normalise=True)
-        if distance == 0:
-            reward = 10.
-        else:
-            reward = 1. - distance
-        #if self.drone.dropped:
-            ## TODO reward based on payload status
-            #distance = self._distance_to_hiker(self.drone.payload_x,
-                                               #self.drone.payload_y,
-                                               #self.drone.alt,
-                                               #normalise=True)
-            ##reward += 10. * (1. - distance + 4 - self.drone.alt) * (4 - self.drone.alt)
+        ## reward for navigation only:
+        #if distance == 0:
+            #reward = 10.
+        #else:
+            #reward = 1. - distance
+        # reward for dropping only
+        if self.drone.dropped:
+            # TODO reward based on payload status
+            distance = self._distance_to_hiker(self.drone.payload_x,
+                                               self.drone.payload_y,
+                                               self.drone.alt - 1,
+                                               normalise=True)
+            #reward += 10. * (1. - distance + 4 - self.drone.alt) * (4 - self.drone.alt)
+            ## max reward on top of hiker
             #if distance == 0:
                 #reward = 10.
             #else:
                 #reward = 1. - distance
+            # proportional reward to distance
+            reward = 1. - distance
         return reward
 
     def _get_observations(self, valid_drone_pos):
