@@ -93,7 +93,7 @@ class AplDropEnv(gym.Env):
     payload_trans = None
 
     def __init__(self):
-        self.action_space = spaces.Discrete(6)
+        self.action_space = spaces.Discrete(7)
         self.observation_space = spaces.Box(low=0, high=255, dtype=np.float32,
                                             shape=(self.OBS_SIZE_X,
                                                    self.OBS_SIZE_Y))
@@ -316,7 +316,7 @@ class AplDropEnv(gym.Env):
         """
         x_pos = rd.randint(0, self.TOP_CAMERA_X - 1)
         y_pos = rd.randint(0, self.TOP_CAMERA_Y - 1)
-        alt = 3  # self.fix_map_around_hiker[x_pos, y_pos] + 1
+        alt = self.fix_map_around_hiker[x_pos, y_pos] + 1
         head = np.random.choice(self.HEADINGS)
         return x_pos, y_pos, alt, head
 
@@ -347,8 +347,8 @@ class AplDropEnv(gym.Env):
                            self.X_MAX - self.HIKER_RELATIVE_POS - 1)
         y_pos = rd.randint(self.Y_MIN + self.HIKER_RELATIVE_POS + 1,
                            self.Y_MAX - self.HIKER_RELATIVE_POS - 1)
-        x_pos = 300
-        y_pos = 300
+        #x_pos = 300
+        #y_pos = 300
         np.set_printoptions(threshold=np.nan)
         return x_pos, y_pos, self.HIKER_RELATIVE_POS, self.HIKER_RELATIVE_POS,\
             self.full_altitude_map[x_pos, y_pos]
@@ -377,6 +377,8 @@ class AplDropEnv(gym.Env):
         if action == 4:
             next_alt += -1
         if action == 5:
+            next_alt += 1
+        if action == 6:
             self.drone.dropped, self.drone.payload_x, self.drone.payload_y, \
                 self.drone.payload_status = self.drop_payload()
         return next_x, next_y, next_alt, next_head
