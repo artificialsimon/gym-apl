@@ -22,10 +22,8 @@ class Drone(object):
 
 
 class Hiker(object):
-    x_global = 0
-    y_global = 0
-    x_local = 0
-    y_local = 0
+    x = 0
+    y = 0
     alt = 0
     required_payload = {}
 
@@ -44,16 +42,7 @@ class PayloadStatus:
 COLOUR_LEVEL = [(0, 0, 0), (10, 10, 10), (20, 20, 20), (30, 30, 30)]
 DRONE_COLOUR = [178, 34, 34]
 HIKER_COLOUR = [0, 0, 255]
-OBJECTS_CODE = {'mountain ridge': 0, 'trail': 1, 'shore bank': 2,
-                'flight tower': 3, 'cabin': 4, 'stripped road': 5,
-                'solo tent': 6, 'runway': 7, 'white Jeep': 8,
-                'water': 9, 'pine trees': 10, 'bush': 11,
-                'active campfire ring': 12, 'firewatch tower': 13,
-                'bushes': 14, 'unstripped road': 15, 'pine tree': 16,
-                'blue Jeep': 17, 'grass': 18, 'family tent': 19,
-                'small hill': 20, 'box canyon': 21,
-                'inactive campfire ring': 22, 'large hill': 23}
-
+PAYLOAD_COLOUR = [18, 145, 21]
 
 class AplDropEnv(gym.Env):
     """ Class for simplified and fast APL on openAI gym interface for dropping
@@ -63,14 +52,17 @@ class AplDropEnv(gym.Env):
     X_MIN = 0
     Y_MAX = 499
     Y_MIN = 0
-    HIKER_RELATIVE_POS = 5
-    TOP_CAMERA_X = HIKER_RELATIVE_POS * 2 + 1
-    TOP_CAMERA_Y = HIKER_RELATIVE_POS * 2 + 1
+    HIKER_X = 5
+    HIKER_Y = 5
+    DRONE_X = 18
+    DRONE_Y = 18
+    TOP_CAMERA_X = 20
+    TOP_CAMERA_Y = 20
     ALTITUDES = np.array([0, 1, 2, 3, 4])
     MAX_DRONE_ALTITUDE = ALTITUDES.max()
     HEADINGS = np.array([1, 2, 3, 4, 5, 6, 7, 8])
-    NORMALISATION_FACTOR = math.sqrt(pow(TOP_CAMERA_X / 2, 2) +
-                                     pow(TOP_CAMERA_Y / 2, 2) +
+    NORMALISATION_FACTOR = math.sqrt(pow(TOP_CAMERA_X, 2) +
+                                     pow(TOP_CAMERA_Y, 2) +
                                      pow(max(ALTITUDES), 2))
     IMAGE_MULTIPLIER = 8
     drone = Drone()
@@ -83,29 +75,40 @@ class AplDropEnv(gym.Env):
     observations = np.zeros((OBS_SIZE_X, OBS_SIZE_Y), dtype=np.float32)
     obs_no_image = np.zeros((OBS_SIZE_X, OBS_SIZE_Y), dtype=np.float32)
     fix_map_around_hiker = np.zeros((OBS_SIZE_X, OBS_SIZE_Y), dtype=np.float32)
-    fix_alt_map_around_hiker = np.zeros((OBS_SIZE_X, OBS_SIZE_Y),
-                                        dtype=np.float32)
     normalised_map_around_hiker = None
     DROP_DISTANCE_FACTOR = 1.0
     number_step = 0
     # render
     dronetrans = None
     payload_trans = None
+    # a fix map
+    alt_map = np.array(
+        [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0],
+         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0],
+         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0],
+         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0],
+         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0],
+         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0],
+         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0],
+         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0],
+         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0],
+         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0],
+         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0],
+         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0],
+         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0],
+         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0],
+         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0],
+         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0],
+         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0],
+         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0],
+         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0],
+         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0]])
 
     def __init__(self):
         self.action_space = spaces.Discrete(7)
         self.observation_space = spaces.Box(low=0, high=255, dtype=np.float32,
                                             shape=(self.OBS_SIZE_X,
                                                    self.OBS_SIZE_Y))
-        dirname = os.path.dirname(__file__)
-        filename = os.path.join(dirname, 'godiland_altitude_min0.npa')
-        with open(filename, 'rb') as file_p:
-            self.full_altitude_map = np.load(file_p)
-            file_p.close()
-        filename = os.path.join(dirname, 'godiland_objects.npa')
-        with open(filename, 'rb') as file_p:
-            self.full_objects_map = np.load(file_p)
-            file_p.close()
         rd.seed()
         self.reset()
 
@@ -139,30 +142,22 @@ class AplDropEnv(gym.Env):
         """ Sets initial state for the env """
         self.number_step = 0
         # Random hiker position
-        self.hiker.x_global, self.hiker.y_global, \
-            self.hiker.x_local, self.hiker.y_local, \
-            self.hiker.alt = self._get_hiker_random_pos()
-        while not self._is_valid_hiker_pos():
-            self.hiker.x_global, self.hiker.y_global, \
-                self.hiker.x_local, self.hiker.y_local, \
-                self.hiker.alt = self._get_hiker_random_pos()
+        self.hiker.x = self.HIKER_X
+        self.hiker.y = self.HIKER_Y
+        self.hiker.alt = 0
         # building the altitude fix map
-        self.fix_map_around_hiker = self._get_alt_map_around(
-            self.hiker.x_global, self.hiker.y_global)
+        self.fix_map_around_hiker = self.alt_map
         self.normalised_map_around_hiker = 255 - np.interp(
             self.fix_map_around_hiker,
             (min(self.ALTITUDES), max(self.ALTITUDES)),
             (0, 1)) * 255
-        self.rgb_map_around_hiker = self._to_rgb5(self.normalised_map_around_hiker)
-        self.fix_alt_map_around_hiker = \
-            self._get_alt_map_around(self.hiker.x_global,
-                                     self.hiker.y_global)
+        self.rgb_map_around_hiker = self._to_rgb5(
+            self.normalised_map_around_hiker)
         # Random drone position
-        self.drone.x, self.drone.y, self.drone.alt, self.drone.head = \
-            self._get_drone_random_pos()
-        while not self._is_valid_drone_pos():
-            self.drone.x, self.drone.y, self.drone.alt, self.drone.head = \
-                self._get_drone_random_pos()
+        self.drone.x = self.DRONE_X
+        self.drone.y = self.DRONE_Y
+        self.drone.alt = 1
+        self.drone.head = 0
         self.drone.payload_x = 0
         self.drone.payload_y = 0
         self.drone.payload_status = None
@@ -177,60 +172,6 @@ class AplDropEnv(gym.Env):
         self.drone.dropped = False
         return self._get_observations(True)
 
-    #def render(self, mode='human', close=False):
-        #from gym.envs.classic_control import rendering
-        #cell_width = 20
-        #cell_height = 20
-        #if self.viewer_ego is None:
-            #self.viewer_ego = rendering.Viewer(self.OBS_SIZE_Y * cell_width,
-                                               #self.OBS_SIZE_X * cell_height)
-            #self.cells = [[rendering.FilledPolygon(
-                #[(y_cell * cell_width, x_cell * cell_height),
-                 #((y_cell + 1) * cell_width, x_cell * cell_height),
-                 #((y_cell + 1) * cell_width, (x_cell + 1) * cell_height),
-                 #(y_cell * cell_width, (x_cell + 1) * cell_width)])
-                           #for x_cell in range(self.OBS_SIZE_X)]
-                          #for y_cell in range(self.OBS_SIZE_Y)]
-            #[[self.viewer_ego.add_geom(self.cells[y_cell][x_cell])
-              #for x_cell in range(self.OBS_SIZE_X)]
-             #for y_cell in range(self.OBS_SIZE_Y)]
-            #[[self.cells[y_cell][x_cell].set_color(self.obs_no_image[x_cell][y_cell] / 255,
-                                                  #self.obs_no_image[x_cell][y_cell] / 255,
-                                                  #self.obs_no_image[x_cell][y_cell] / 255)
-              #for x_cell in range(self.OBS_SIZE_X)]
-             #for y_cell in range(self.OBS_SIZE_Y)]
-            ##np.set_printoptions(threshold=np.nan)
-            ##print(self.obs_no_image)
-            #drone = rendering.FilledPolygon(
-                #[(1, 1), (1, cell_width), (cell_width, int(cell_height / 2))])
-            #self.dronetrans = rendering.Transform()
-            #drone.add_attr(self.dronetrans)
-            #self.viewer_ego.add_geom(drone)
-            #self.dronetrans.set_translation(self.drone.x * cell_width,
-                                            #self.drone.y * cell_height)
-            #drone.set_color(.8, .6, .3)
-            #payload = rendering.FilledPolygon(
-                #[(3, 3), (3, cell_width * .75),
-                 #(cell_height * .75, cell_height * .75),
-                 #(cell_height * .75, 3)])
-            #self.payload_trans = rendering.Transform()
-            #payload.add_attr(self.payload_trans)
-            #self.viewer_ego.add_geom(payload)
-            #self.payload_trans.set_translation(-100, -100)
-            #payload.set_color(.3, .3, .8)
-        #self.dronetrans.set_translation(self.drone.x * cell_width,
-                                        #self.drone.y * cell_height)
-        #if self.drone.dropped:
-            ##self.dronetrans.set_translation(1, 1)
-            #self.payload_trans.set_translation(
-                #(self.drone.payload_x) * cell_width,
-                #self.drone.payload_y * cell_height)
-        #if not self._is_valid_drone_pos():
-            #self.dronetrans.set_translation(-100, -100)
-
-        #self._set_cells_color()
-        #time.sleep(0.09)
-        #return self.viewer_ego.render(return_rgb_array=mode == 'rgb_array')
 
     @staticmethod
     def _to_rgb5(image):
@@ -263,52 +204,6 @@ class AplDropEnv(gym.Env):
     #def seed(self, seed=None):
         #return 1
 
-    def _set_cells_color(self):
-        #for width_cell in range(self.OBS_SIZE_Y):
-            #for height_cell in range(self.OBS_SIZE_X):
-                #if self.observations[height_cell][width_cell] == -1:
-                    #color = (0.0, 0.0, 0.0)
-                #elif self.observations[height_cell][width_cell] == 0:
-                    #color = (0.0, 0.45, 0.14)
-                #elif self.observations[height_cell][width_cell] == 1:
-                    #color = (0.0, 0.72, 0.22)
-                #elif self.observations[height_cell][width_cell] == 2:
-                    #color = (0.0, 0.87, 0.27)
-                #elif self.observations[height_cell][width_cell] == 3:
-                    #color = (0.47, 0.99, 0.63)
-                #elif self.observations[height_cell][width_cell] == 4:
-                    #color = (0.65, 0.99, 0.76)
-                #elif self.observations[height_cell][width_cell] == 5:
-                    #color = (1.0, 0.0, 0.0)
-                #elif self.observations[height_cell][width_cell] == 6:
-                    #color = (1.0, 0.2, 0.2)
-                #elif self.observations[height_cell][width_cell] == 7:
-                    #color = (1.0, 0.5, 0.5)
-                #elif self.observations[height_cell][width_cell] == 8:
-                    #color = (1.0, 0.7, 0.7)
-                #elif self.observations[height_cell][width_cell] == 255:
-                    #color = (0.3, 0.7, 0.2)
-                #else:
-                    #color = (0.5, self.observations[height_cell][width_cell] / 18., 0.5)
-                #self.cells[width_cell][height_cell].set_color(color[0],
-                                                              #color[1],
-                                                              #color[2])
-        self.cells[self.OBS_SIZE_Y - 1][0].set_color(
-            self.obs_no_image[0][self.OBS_SIZE_Y - 1] / 255,
-            self.obs_no_image[0][self.OBS_SIZE_Y - 1] / 255,
-            self.obs_no_image[0][self.OBS_SIZE_Y - 1] / 255)
-        self.cells[self.OBS_SIZE_Y - 1][1].set_color(
-            self.obs_no_image[1][self.OBS_SIZE_Y - 1] / 255,
-            self.obs_no_image[1][self.OBS_SIZE_Y - 1] / 255,
-            self.obs_no_image[1][self.OBS_SIZE_Y - 1] / 255)
-        self.cells[self.OBS_SIZE_Y - 1][2].set_color(
-            self.obs_no_image[2][self.OBS_SIZE_Y - 1] / 255,
-            self.obs_no_image[2][self.OBS_SIZE_Y - 1] / 255,
-            self.obs_no_image[2][self.OBS_SIZE_Y - 1] / 255)
-        self.cells[self.OBS_SIZE_Y - 1][3].set_color(
-            self.obs_no_image[3][self.OBS_SIZE_Y - 1] / 255,
-            self.obs_no_image[3][self.OBS_SIZE_Y - 1] / 255,
-            self.obs_no_image[3][self.OBS_SIZE_Y - 1] / 255)
 
     def _get_drone_random_pos(self):
         """ Returns random values for initial positions inside view
@@ -335,23 +230,20 @@ class AplDropEnv(gym.Env):
             #print("choco piso")
             return False
         if self.CHECK_ALTITUDE:
-            if self.drone.alt <= self.fix_alt_map_around_hiker[self.drone.x,
-                                                               self.drone.y]:
+            if self.drone.alt <= self.alt_map[self.drone.x, self.drone.y]:
                 #print("hit something")
                 return False
         return True
 
     def _get_hiker_random_pos(self):
         """ Returns random position of the hiker within boundaries"""
-        x_pos = rd.randint(self.X_MIN + self.HIKER_RELATIVE_POS + 1,
-                           self.X_MAX - self.HIKER_RELATIVE_POS - 1)
-        y_pos = rd.randint(self.Y_MIN + self.HIKER_RELATIVE_POS + 1,
-                           self.Y_MAX - self.HIKER_RELATIVE_POS - 1)
-        #x_pos = 300
-        #y_pos = 300
-        np.set_printoptions(threshold=np.nan)
-        return x_pos, y_pos, self.HIKER_RELATIVE_POS, self.HIKER_RELATIVE_POS,\
-            self.full_altitude_map[x_pos, y_pos]
+        #x_pos = rd.randint(self.X_MIN + self.HIKER_RELATIVE_POS + 1,
+                           #self.X_MAX - self.HIKER_RELATIVE_POS - 1)
+        #y_pos = rd.randint(self.Y_MIN + self.HIKER_RELATIVE_POS + 1,
+                           #self.Y_MAX - self.HIKER_RELATIVE_POS - 1)
+        x_pos = 5
+        y_pos = 10
+        return x_pos, y_pos, 0
 
     def _is_valid_hiker_pos(self):
         """ validate hikers initial position """
@@ -378,9 +270,9 @@ class AplDropEnv(gym.Env):
             next_alt += -1
         if action == 5:
             next_alt += 1
-        if action == 6:
-            self.drone.dropped, self.drone.payload_x, self.drone.payload_y, \
-                self.drone.payload_status = self.drop_payload()
+        #if action == 6:
+            #self.drone.dropped, self.drone.payload_x, self.drone.payload_y, \
+                #self.drone.payload_status = self.drop_payload()
         return next_x, next_y, next_alt, next_head
 
     def drop_payload(self):
@@ -399,50 +291,44 @@ class AplDropEnv(gym.Env):
                                            self.drone.y,
                                            self.drone.alt - 1,
                                            normalise=True)
-        ## reward for navigation only:
-        #if distance == 0:
-            #reward = 10.
-        #else:
-            #reward = 1. - distance
-        # reward for dropping only
-        if self.drone.dropped:
-            # TODO reward based on payload status
-            distance = self._distance_to_hiker(self.drone.payload_x,
-                                               self.drone.payload_y,
-                                               self.drone.alt - 1,
-                                               normalise=True)
-            #reward += 10. * (1. - distance + 4 - self.drone.alt) * (4 - self.drone.alt)
-            ## max reward on top of hiker
-            #if distance == 0:
-                #reward = 10.
-            #else:
-                #reward = 1. - distance
-            # proportional reward to distance
+        # reward for navigation only:
+        if distance == 0:
+            reward = 10.
+        else:
             reward = 1. - distance
+        # reward for dropping only
+        #if self.drone.dropped:
+            ## TODO reward based on payload status
+            #distance = self._distance_to_hiker(self.drone.payload_x,
+                                               #self.drone.payload_y,
+                                               #self.drone.alt - 1,
+                                               #normalise=True)
+            ##reward += 10. * (1. - distance + 4 - self.drone.alt) * (4 - self.drone.alt)
+            ### max reward on top of hiker
+            ##if distance == 0:
+                ##reward = 10.
+            ##else:
+                ##reward = 1. - distance
+            ## proportional reward to distance
+            #reward = 1. - distance
         return reward
 
     def _get_observations(self, valid_drone_pos):
         obs = np.copy(self.rgb_map_around_hiker)
-        #if valid_drone_pos:
-            ## Drone altitude
-            #obs[0, self.OBS_SIZE_Y - 1, 0] = self.drone.alt / \
-                #self.ALTITUDES.max() * 255
-            #obs[0, self.OBS_SIZE_Y - 1, 1] = self.drone.alt / \
-                #self.ALTITUDES.max() * 155
-            #obs[0, self.OBS_SIZE_Y - 1, 2] = self.drone.alt / \
-                #self.ALTITUDES.max() * 55
-            ## Drone heading
-            #obs[1, self.OBS_SIZE_Y - 1, :] = self.drone.head / \
-                #self.HEADINGS.max() * 255
-            ## Drone relative x pos
-            #obs[2, self.OBS_SIZE_Y - 1, :] = self.drone.x / self.TOP_CAMERA_X \
-                #* 255
-            ## Drone relative y pos
-            #obs[3, self.OBS_SIZE_Y - 1, :] = self.drone.y / self.TOP_CAMERA_Y \
-                #* 255
-
         obs = np.kron(obs, np.ones([self.IMAGE_MULTIPLIER,
                                     self.IMAGE_MULTIPLIER, 1]))
+        if self.drone.dropped:
+            payload_row = [np.uint8(self.drone.payload_x * self.IMAGE_MULTIPLIER),
+                np.uint8((self.drone.payload_x + 1) * self.IMAGE_MULTIPLIER),
+                np.uint8((self.drone.payload_x + 1) * self.IMAGE_MULTIPLIER),
+                np.uint8((self.drone.payload_x) * self.IMAGE_MULTIPLIER)]
+
+            payload_col = [np.uint8(self.drone.payload_y * self.IMAGE_MULTIPLIER),
+                np.uint8((self.drone.payload_y) * self.IMAGE_MULTIPLIER),
+                np.uint8((self.drone.payload_y + 1) * self.IMAGE_MULTIPLIER),
+                np.uint8((self.drone.payload_y + 1) * self.IMAGE_MULTIPLIER)]
+            rr, cc = draw.polygon(payload_row, payload_col)
+            draw.set_color(obs, (rr, cc), PAYLOAD_COLOUR)
         if valid_drone_pos:
             # draw drone
             rr, cc = draw.circle_perimeter(np.uint8((self.drone.x + 0.5) *
@@ -453,67 +339,30 @@ class AplDropEnv(gym.Env):
                                                     7.5 * self.drone.alt))
             draw.set_color(obs, (rr, cc), DRONE_COLOUR)
             # draw hiker as an x
-            rr, cc = draw.line(np.uint8(self.hiker.x_local *
+            rr, cc = draw.line(np.uint8(self.hiker.x *
                                         self.IMAGE_MULTIPLIER),
-                               np.uint8(self.hiker.y_local *
+                               np.uint8(self.hiker.y *
                                         self.IMAGE_MULTIPLIER),
-                               np.uint8((self.hiker.x_local + 1) *
+                               np.uint8((self.hiker.x + 1) *
                                         self.IMAGE_MULTIPLIER),
-                               np.uint8((self.hiker.y_local + 1) *
+                               np.uint8((self.hiker.y + 1) *
                                         self.IMAGE_MULTIPLIER))
             draw.set_color(obs, (rr, cc), HIKER_COLOUR)
-            rr, cc = draw.line(np.uint8((self.hiker.x_local + 1) *
+            rr, cc = draw.line(np.uint8((self.hiker.x + 1) *
                                         self.IMAGE_MULTIPLIER),
-                               np.uint8(self.hiker.y_local *
+                               np.uint8(self.hiker.y *
                                         self.IMAGE_MULTIPLIER),
-                               np.uint8(self.hiker.x_local *
+                               np.uint8(self.hiker.x *
                                         self.IMAGE_MULTIPLIER),
-                               np.uint8((self.hiker.y_local + 1) *
+                               np.uint8((self.hiker.y + 1) *
                                         self.IMAGE_MULTIPLIER))
             draw.set_color(obs, (rr, cc), HIKER_COLOUR)
-
-        #print(obs.shape)
-        #from matplotlib import pyplot as PLT
-        #PLT.imshow(obs.astype(np.uint8))
-        #PLT.show()
-        #print(obs)
-        #exit(1)
         return obs
 
-    # TODO merge _get_alt_map_around with _get_map_around
-    def _get_alt_map_around(self, x_pos, y_pos):
-        """ returns the map around the x and y pos, with objects altitude """
-        map_around = np.zeros((self.OBS_SIZE_X, self.OBS_SIZE_Y),
-                              dtype=np.float32)
-        for x_cell in range(self.TOP_CAMERA_X):
-            for y_cell in range(self.TOP_CAMERA_Y):
-                try:
-                    alt = self.full_altitude_map[
-                        int(x_pos - self.TOP_CAMERA_X / 2 + x_cell) + 1][
-                            int(y_pos - self.TOP_CAMERA_Y / 2 + y_cell) + 1]
-                    map_around[x_cell][y_cell] = alt
-                except IndexError:
-                    map_around[x_cell][y_cell] = -1
-        return map_around
-
-    def _get_map_around(self, x_pos, y_pos):
-        """ returns the map around the x and y pos, with objects code """
-        map_around = np.zeros((self.OBS_SIZE_X, self.OBS_SIZE_Y),
-                              dtype=np.float32)
-        for x_cell in range(self.TOP_CAMERA_X):
-            for y_cell in range(self.TOP_CAMERA_Y):
-                try:
-                    alt = self.full_objects_map[
-                        int(x_pos - self.TOP_CAMERA_X / 2 + x_cell)][
-                            int(y_pos - self.TOP_CAMERA_Y / 2 + y_cell)]
-                    map_around[x_cell][y_cell] = alt
-                except IndexError:
-                    map_around[x_cell][y_cell] = -1
-        return map_around
 
     def _distance_to_hiker(self, pos_x, pos_y, alt, normalise=True):
-        dist = math.sqrt(pow(self.HIKER_RELATIVE_POS - pos_x, 2) +
-                         pow(self.HIKER_RELATIVE_POS - pos_y, 2) +
+        dist = math.sqrt(pow(self.hiker.x - pos_x, 2) +
+                         pow(self.hiker.y - pos_y, 2) +
                          pow(self.hiker.alt - alt, 2))
         if normalise:
             dist = dist / self.NORMALISATION_FACTOR
