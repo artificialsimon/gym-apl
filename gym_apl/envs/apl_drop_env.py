@@ -106,7 +106,7 @@ class AplDropEnv(gym.Env):
          [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0]])
 
     def __init__(self):
-        self.action_space = spaces.Discrete(6)
+        self.action_space = spaces.Discrete(7)
         self.observation_space = spaces.Box(low=0, high=255, dtype=np.float32,
                                             shape=(self.OBS_SIZE_X,
                                                    self.OBS_SIZE_Y))
@@ -271,9 +271,9 @@ class AplDropEnv(gym.Env):
             next_alt += -1
         if action == 5:
             next_alt += 1
-        #if action == 6:
-            #self.drone.dropped, self.drone.payload_x, self.drone.payload_y, \
-                #self.drone.payload_status = self.drop_payload()
+        if action == 6:
+            self.drone.dropped, self.drone.payload_x, self.drone.payload_y, \
+                self.drone.payload_status = self.drop_payload()
         return next_x, next_y, next_alt, next_head
 
     def drop_payload(self):
