@@ -54,8 +54,8 @@ class AplDropEnv(gym.Env):
     Y_MIN = 0
     HIKER_X = 5
     HIKER_Y = 5
-    DRONE_X = 19
-    DRONE_Y = 19
+    DRONE_X = 18
+    DRONE_Y = 18
     TOP_CAMERA_X = 20
     TOP_CAMERA_Y = 20
     ALTITUDES = np.array([0, 1, 2, 3, 4])
@@ -77,33 +77,33 @@ class AplDropEnv(gym.Env):
     fix_map_around_hiker = np.zeros((OBS_SIZE_X, OBS_SIZE_Y), dtype=np.float32)
     normalised_map_around_hiker = None
     DROP_DISTANCE_FACTOR = 1.0
-    MAX_STEPS = 50
+    MAX_STEPS = 500
     number_step = 0
     # render
     dronetrans = None
     payload_trans = None
     # a fix map
     alt_map = np.array(
-        [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 3],
-         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0]])
+        [[1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3, 0, 0, 0],
+         [1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3, 0, 0, 0],
+         [1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3, 0, 0, 0],
+         [1, 2, 2, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3, 0, 0, 0],
+         [1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3, 3, 3, 3],
+         [1, 2, 2, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3, 0, 0, 0],
+         [1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 3, 0, 0, 0],
+         [1, 2, 3, 3, 3, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 0, 0, 0, 0, 0],
+         [1, 3, 3, 3, 3, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3, 0, 0, 0],
+         [1, 3, 3, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3, 0, 0, 0],
+         [1, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3, 0, 0, 0],
+         [1, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 0, 0, 0],
+         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 0, 0, 0],
+         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3, 0, 0, 0],
+         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3, 0, 0, 0],
+         [1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 3, 3, 3, 0, 0, 0],
+         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3, 0, 0, 0],
+         [1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 3, 3, 3, 0, 0, 0],
+         [1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 3, 3, 3, 0, 0, 0],
+         [1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 3, 3, 3, 0, 0, 0]])
 
     def __init__(self):
         self.action_space = spaces.Discrete(7)
@@ -137,6 +137,7 @@ class AplDropEnv(gym.Env):
             reward = self._reward(valid_drone_pos)
         info = {}
         #print(action, reward) #, self.observations)
+        #print("after step: ", self.drone.x, self.drone.y, self.drone.alt)
         return self.observations, reward, done, info
 
     def reset(self):
@@ -255,6 +256,10 @@ class AplDropEnv(gym.Env):
 
     def _one_step(self, action):
         """ Dynamics for actions. Follows APL """
+        prev_x = self.drone.x
+        prev_y = self.drone.y
+        prev_alt = self.drone.alt
+        prev_head = self.drone.head
         next_x = self.drone.x
         next_y = self.drone.y
         next_alt = self.drone.alt
@@ -274,6 +279,12 @@ class AplDropEnv(gym.Env):
         if action == 6:
             self.drone.dropped, self.drone.payload_x, self.drone.payload_y, \
                 self.drone.payload_status = self.drop_payload()
+        self.drone.x = next_x
+        self.drone.y = next_y
+        self.drone.alt = next_alt
+        self.drone.head = next_head
+        if not self._is_valid_drone_pos():
+            return prev_x, prev_y, prev_alt, prev_head
         return next_x, next_y, next_alt, next_head
 
     def drop_payload(self):
@@ -292,11 +303,18 @@ class AplDropEnv(gym.Env):
                                            self.drone.y,
                                            self.drone.alt - 1,
                                            normalise=True)
-        # reward for navigation only:
+        ## reward for navigation only:
+        #if distance == 0:
+            #reward = 10.
+        #else:
+            #reward = 1. - distance
+        # reward for navigation only v2.
         if distance == 0:
-            reward = 10.
+            reward = 1.
+            print("made it")
         else:
-            reward = 1. - distance
+            reward = .1
+
         # reward for dropping only
         #if self.drone.dropped:
             ## TODO reward based on payload status
