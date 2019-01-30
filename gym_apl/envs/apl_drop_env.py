@@ -77,7 +77,7 @@ class AplDropEnv(gym.Env):
     fix_map_around_hiker = np.zeros((OBS_SIZE_X, OBS_SIZE_Y), dtype=np.float32)
     normalised_map_around_hiker = None
     DROP_DISTANCE_FACTOR = 1.0
-    MAX_STEPS = 500
+    MAX_STEPS = 1000
     number_step = 0
     # render
     dronetrans = None
@@ -276,9 +276,9 @@ class AplDropEnv(gym.Env):
             next_alt += -1
         if action == 5:
             next_alt += 1
-        if action == 6:
-            self.drone.dropped, self.drone.payload_x, self.drone.payload_y, \
-                self.drone.payload_status = self.drop_payload()
+        #if action == 6:
+            #self.drone.dropped, self.drone.payload_x, self.drone.payload_y, \
+                #self.drone.payload_status = self.drop_payload()
         self.drone.x = next_x
         self.drone.y = next_y
         self.drone.alt = next_alt
@@ -313,7 +313,7 @@ class AplDropEnv(gym.Env):
             reward = 1.
             print("made it")
         else:
-            reward = .1
+            reward = -.1
 
         # reward for dropping only
         #if self.drone.dropped:
