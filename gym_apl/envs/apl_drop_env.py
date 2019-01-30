@@ -106,7 +106,7 @@ class AplDropEnv(gym.Env):
          [1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 3, 3, 3, 0, 0, 0]])
 
     def __init__(self):
-        self.action_space = spaces.Discrete(7)
+        self.action_space = spaces.Discrete(6)
         self.observation_space = spaces.Box(low=0, high=255, dtype=np.float32,
                                             shape=(self.OBS_SIZE_X,
                                                    self.OBS_SIZE_Y))
@@ -310,7 +310,7 @@ class AplDropEnv(gym.Env):
             #reward = 1. - distance
         # reward for navigation only v2.
         if distance == 0:
-            reward = 1.
+            reward = 100.
             print("made it")
         else:
             reward = -.1
