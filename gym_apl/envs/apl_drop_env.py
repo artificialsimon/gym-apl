@@ -77,7 +77,7 @@ class AplDropEnv(gym.Env):
     fix_map_around_hiker = np.zeros((OBS_SIZE_X, OBS_SIZE_Y), dtype=np.float32)
     normalised_map_around_hiker = None
     DROP_DISTANCE_FACTOR = 1.0
-    MAX_STEPS = 1000
+    MAX_STEPS = 50
     number_step = 0
     # render
     dronetrans = None
@@ -126,10 +126,10 @@ class AplDropEnv(gym.Env):
         if not valid_drone_pos or self.drone.dropped or \
            self.number_step == self.MAX_STEPS:
             done = True
-        #if self._distance_to_hiker(self.drone.x,
-                                   #self.drone.y, self.drone.alt - 1,
-                                   #normalise=False) == 0:
-            #done = True
+        if self._distance_to_hiker(self.drone.x,
+                                   self.drone.y, self.drone.alt - 1,
+                                   normalise=False) == 0:
+            done = True
         self.observations = self._get_observations(valid_drone_pos)
         if action == -1:  # intialisation
             reward = .0
@@ -156,9 +156,12 @@ class AplDropEnv(gym.Env):
         self.rgb_map_around_hiker = self._to_rgb5(
             self.normalised_map_around_hiker)
         # Random drone position
-        self.drone.x = self.DRONE_X
-        self.drone.y = self.DRONE_Y
-        self.drone.alt = 1
+        #self.drone.x = self.DRONE_X
+        #self.drone.y = self.DRONE_Y
+        #self.drone.alt = 1
+        self.drone.x = rd.randint(0, self.TOP_CAMERA_X - 1)
+        self.drone.y = rd.randint(0, self.TOP_CAMERA_Y - 1)
+        self.drone.alt = self.alt_map[self.drone.x, self.drone.y] + 1
         self.drone.head = 0
         self.drone.payload_x = 0
         self.drone.payload_y = 0
