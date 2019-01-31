@@ -178,7 +178,7 @@ class AplDropEnv(gym.Env):
     def _is_done(self):
         if self._distance_to_hiker(self.drone.actual_x,
                                    self.drone.actual_y,
-                                   self.drone.actual_alt - 1,
+                                   self.drone.actual_alt - 4,
                                    normalise=False) == 0:
             return True
         return False
@@ -316,7 +316,7 @@ class AplDropEnv(gym.Env):
                                            self.drone.actual_alt - 4,
                                            normalise=True)
         if distance == 0:
-            print("made it")
+            #print("made it")
             return 100.
         prev_distance = self._distance_to_hiker(self.drone.prev_x,
                                                 self.drone.prev_y,
