@@ -52,16 +52,12 @@ class AplDropEnv(gym.Env):
     """ Class for simplified and fast APL on openAI gym interface for dropping
         payload """
     metadata = {'render.modes': ['human']}
-    X_MAX = 499
-    X_MIN = 0
-    Y_MAX = 499
-    Y_MIN = 0
-    HIKER_X = 5
-    HIKER_Y = 5
+    HIKER_X = 10
+    HIKER_Y = 10
     DRONE_X = 18
     DRONE_Y = 18
-    TOP_CAMERA_X = 20
-    TOP_CAMERA_Y = 20
+    TOP_CAMERA_X = 21
+    TOP_CAMERA_Y = 21
     ALTITUDES = np.array([0, 1, 2, 3, 4])
     MAX_DRONE_ALTITUDE = ALTITUDES.max()
     HEADINGS = np.array([1, 2, 3, 4, 5, 6, 7, 8])
@@ -99,7 +95,8 @@ class AplDropEnv(gym.Env):
          [1, 2, 3, 3, 3, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 0, 0, 0, 0, 0],
          [1, 3, 3, 3, 3, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3, 0, 0, 0],
          [1, 3, 3, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3, 0, 0, 0],
-         [1, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3, 0, 0, 0],
+         [1, 3, 3, 2, 2, 2, 2, 1, 1, 1, 0, 1, 1, 1, 1, 3, 3, 3, 0, 0, 0],
+         [1, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 0, 0, 0],
          [1, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 0, 0, 0],
          [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 0, 0, 0],
          [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3, 0, 0, 0],
@@ -111,6 +108,10 @@ class AplDropEnv(gym.Env):
          [1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 3, 3, 3, 0, 0, 0]])
 
     def __init__(self):
+        assert self.alt_map.shape == (self.TOP_CAMERA_X, self.TOP_CAMERA_Y),\
+            "Map shape (%r, %r) not equal to sensor space (%r, %r)" % \
+            (self.alt_map.shape[0], self.alt_map.shape[1],
+             self.TOP_CAMERA_X, self.TOP_CAMERA_Y)
         self.action_space = spaces.Discrete(7)
         self.observation_space = spaces.Box(low=0, high=255, dtype=np.float32,
                                             shape=(self.OBS_SIZE_X,
@@ -237,10 +238,11 @@ class AplDropEnv(gym.Env):
             #print("arriba")
             return False
         if self.drone.actual_alt <= self.ALTITUDES.min():
-            #print("choco piso")
+            #print("hit the floor")
             return False
         if self.CHECK_ALTITUDE:
-            if self.drone.actual_alt <= self.alt_map[self.drone.actual_x, self.drone.actual_y]:
+            if self.drone.actual_alt <= self.alt_map[self.drone.actual_x,
+                                                     self.drone.actual_y]:
                 #print("hit something")
                 return False
         return True
