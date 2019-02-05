@@ -326,7 +326,7 @@ class AplDropEnv(gym.Env):
                                                 normalise=True)
         if prev_distance - distance > 0:
             return .1
-        return -1.
+        return -.1
 
     def _get_observations(self, valid_drone_pos):
         obs = np.copy(self.rgb_map_around_hiker)
