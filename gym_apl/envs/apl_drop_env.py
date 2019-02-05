@@ -139,7 +139,7 @@ class AplDropEnv(gym.Env):
         else:
             reward = self._reward(valid_drone_pos, action)
         info = {}
-        #print(action, reward) #, self.observations)
+        print("Action:", action, "reward:", reward) #, self.observations)
         # print("after step: ", self.drone.actual_x, self.drone.actual_y, self.drone.actual_alt)
         return self.observations, reward, done, info
 
@@ -310,9 +310,9 @@ class AplDropEnv(gym.Env):
             negative reward for changing altitude and dropping
         """
         if not is_valid_pos:
-            return -1.
+            return -10.
         if action in {4, 5, 6}:
-            return -1.
+            return -10.
         distance = self._distance_to_hiker(self.drone.actual_x,
                                            self.drone.actual_y,
                                            self.drone.actual_alt - 4,
@@ -320,10 +320,6 @@ class AplDropEnv(gym.Env):
         if distance == 0:
             #print("made it")
             return 1.
-        prev_distance = self._distance_to_hiker(self.drone.prev_x,
-                                                self.drone.prev_y,
-                                                self.drone.prev_alt - 4,
-                                                normalise=True)
         if prev_distance - distance > 0:
             return .1
         return -.1
@@ -346,7 +342,7 @@ class AplDropEnv(gym.Env):
             draw.set_color(obs, (rr, cc), PAYLOAD_COLOUR)
         if valid_drone_pos:
             # draw drone
-            rr, cc = draw.circle_perimeter(np.uint8((self.drone.actual_x + 0.5) *
+            rr, cc = draw.circle(np.uint8((self.drone.actual_x + 0.5) *
                                                     self.IMAGE_MULTIPLIER),
                                            np.uint8((self.drone.actual_y + 0.5) *
                                                     self.IMAGE_MULTIPLIER),
