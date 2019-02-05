@@ -74,7 +74,6 @@ class AplDropEnv(gym.Env):
     cells = None
     observations = np.zeros((OBS_SIZE_X, OBS_SIZE_Y), dtype=np.float32)
     obs_no_image = np.zeros((OBS_SIZE_X, OBS_SIZE_Y), dtype=np.float32)
-    fix_map_around_hiker = np.zeros((OBS_SIZE_X, OBS_SIZE_Y), dtype=np.float32)
     normalised_map_around_hiker = None
     DROP_DISTANCE_FACTOR = 1.0
     MAX_STEPS = 50
@@ -151,9 +150,8 @@ class AplDropEnv(gym.Env):
         self.hiker.y_pos = self.HIKER_Y
         self.hiker.alt = 0
         # building the altitude fix map
-        self.fix_map_around_hiker = self.alt_map
         self.normalised_map_around_hiker = 255 - np.interp(
-            self.fix_map_around_hiker,
+            self.alt_map,
             (min(self.ALTITUDES), max(self.ALTITUDES)),
             (0, 1)) * 255
         self.rgb_map_around_hiker = self._to_rgb5(
@@ -169,7 +167,6 @@ class AplDropEnv(gym.Env):
                                        Payload.payloads[3],
                                        Payload.payloads[1]]
         if self.viewer_ego is not None:
-            self._reset_viewer()
             if self.drone.dropped:
                 time.sleep(1)
         self.drone.dropped = False
@@ -191,29 +188,15 @@ class AplDropEnv(gym.Env):
 
     def render(self, mode='human'):
         img = self.observations.astype(np.uint8)
-        #print(img.shape[0])
-        #print(img.shape[1])
-        #print(img.shape[2])
-        #exit(1)
         time.sleep(0.1)
         if mode == 'rgb_array':
             return img
         elif mode == 'human':
             from gym.envs.classic_control import rendering
-            #from skimage.color import rgb2gray
-            #img = rgb2gray(img)
             if self.viewer_ego is None:
                 self.viewer_ego = rendering.SimpleImageViewer()
             self.viewer_ego.imshow(img)
             return self.viewer_ego.isopen
-
-
-    def _reset_viewer(self):
-        #self.payload_trans.set_translation(-100, -100)
-        return 1
-
-    #def seed(self, seed=None):
-        #return 1
 
 
     def _get_drone_random_pos(self):
@@ -222,7 +205,7 @@ class AplDropEnv(gym.Env):
         """
         x_pos = rd.randint(0, self.TOP_CAMERA_X - 1)
         y_pos = rd.randint(0, self.TOP_CAMERA_Y - 1)
-        alt = 4  # self.fix_map_around_hiker[x_pos, y_pos] + 1
+        alt = 4  # self.alt_map[x_pos, y_pos] + 1
         head = 0  # np.random.choice(self.HEADINGS)
         return x_pos, y_pos, alt, head
 
@@ -232,10 +215,10 @@ class AplDropEnv(gym.Env):
                 self.drone.actual_x >= self.TOP_CAMERA_X or \
                 self.drone.actual_y < 0 or \
                 self.drone.actual_y >= self.TOP_CAMERA_Y:
-            #print("fuera")
+            #print("side out")
             return False
         if self.drone.actual_alt > self.MAX_DRONE_ALTITUDE:
-            #print("arriba")
+            #print("up out")
             return False
         if self.drone.actual_alt <= self.ALTITUDES.min():
             #print("hit the floor")
@@ -333,12 +316,14 @@ class AplDropEnv(gym.Env):
         obs = np.kron(obs, np.ones([self.IMAGE_MULTIPLIER,
                                     self.IMAGE_MULTIPLIER, 1]))
         if self.drone.dropped:
-            payload_row = [np.uint8(self.drone.payload_x * self.IMAGE_MULTIPLIER),
+            payload_row = [
+                np.uint8(self.drone.payload_x * self.IMAGE_MULTIPLIER),
                 np.uint8((self.drone.payload_x + 1) * self.IMAGE_MULTIPLIER),
                 np.uint8((self.drone.payload_x + 1) * self.IMAGE_MULTIPLIER),
                 np.uint8((self.drone.payload_x) * self.IMAGE_MULTIPLIER)]
 
-            payload_col = [np.uint8(self.drone.payload_y * self.IMAGE_MULTIPLIER),
+            payload_col = [
+                np.uint8(self.drone.payload_y * self.IMAGE_MULTIPLIER),
                 np.uint8((self.drone.payload_y) * self.IMAGE_MULTIPLIER),
                 np.uint8((self.drone.payload_y + 1) * self.IMAGE_MULTIPLIER),
                 np.uint8((self.drone.payload_y + 1) * self.IMAGE_MULTIPLIER)]
@@ -346,12 +331,13 @@ class AplDropEnv(gym.Env):
             draw.set_color(obs, (rr, cc), PAYLOAD_COLOUR)
         if valid_drone_pos:
             # draw drone
-            rr, cc = draw.circle_perimeter(np.uint8((self.drone.actual_x + 0.5) *
-                                                    self.IMAGE_MULTIPLIER),
-                                           np.uint8((self.drone.actual_y + 0.5) *
-                                                    self.IMAGE_MULTIPLIER),
-                                           np.uint8(self.IMAGE_MULTIPLIER /
-                                                    7.5 * self.drone.actual_alt))
+            rr, cc = draw.circle_perimeter(
+                np.uint8((self.drone.actual_x + 0.5) *
+                         self.IMAGE_MULTIPLIER),
+                np.uint8((self.drone.actual_y + 0.5) *
+                         self.IMAGE_MULTIPLIER),
+                np.uint8(self.IMAGE_MULTIPLIER /
+                         7.5 * self.drone.actual_alt))
             draw.set_color(obs, (rr, cc), DRONE_COLOUR)
             # draw hiker as an x
             rr, cc = draw.line(np.uint8(self.hiker.x_pos *
