@@ -67,8 +67,8 @@ class AplDropEnv(gym.Env):
     IMAGE_MULTIPLIER = 8
     drone = Drone()
     hiker = Hiker()
-    OBS_SIZE_X = TOP_CAMERA_X
-    OBS_SIZE_Y = TOP_CAMERA_Y  # + 1  # Extra column for sensors
+    OBS_SIZE_X = TOP_CAMERA_X * IMAGE_MULTIPLIER
+    OBS_SIZE_Y = TOP_CAMERA_Y * IMAGE_MULTIPLIER
     CHECK_ALTITUDE = True
     viewer_ego = None
     cells = None
@@ -115,7 +115,7 @@ class AplDropEnv(gym.Env):
         self.action_space = spaces.Discrete(7)
         self.observation_space = spaces.Box(low=0, high=255, dtype=np.float32,
                                             shape=(self.OBS_SIZE_X,
-                                                   self.OBS_SIZE_Y))
+                                                   self.OBS_SIZE_Y, 3))
         rd.seed()
         self.reset()
 
@@ -319,13 +319,13 @@ class AplDropEnv(gym.Env):
                                            normalise=True)
         if distance == 0:
             #print("made it")
-            return 100.
+            return 1.
         prev_distance = self._distance_to_hiker(self.drone.prev_x,
                                                 self.drone.prev_y,
                                                 self.drone.prev_alt - 4,
                                                 normalise=True)
         if prev_distance - distance > 0:
-            return 1.
+            return .1
         return -1.
 
     def _get_observations(self, valid_drone_pos):
