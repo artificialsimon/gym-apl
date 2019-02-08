@@ -147,9 +147,8 @@ class AplDropEnv(gym.Env):
         """ Sets initial state for the env """
         self.number_step = 0
         # Random hiker position
-        self.hiker.x_pos = self.HIKER_X
-        self.hiker.y_pos = self.HIKER_Y
-        self.hiker.alt = 0
+        self.hiker.x_pos, self.hiker.y_pos, self.hiker.alt = \
+            self._get_hiker_random_pos()
         # building the altitude fix map
         self.fix_map_around_hiker = self.alt_map
         self.normalised_map_around_hiker = 255 - np.interp(
@@ -222,7 +221,7 @@ class AplDropEnv(gym.Env):
         """
         x_pos = rd.randint(0, self.TOP_CAMERA_X - 1)
         y_pos = rd.randint(0, self.TOP_CAMERA_Y - 1)
-        alt = 4  # self.fix_map_around_hiker[x_pos, y_pos] + 1
+        alt = min(self.fix_map_around_hiker[x_pos, y_pos] + 1, 4)
         head = 0  # np.random.choice(self.HEADINGS)
         return x_pos, y_pos, alt, head
 
@@ -255,7 +254,10 @@ class AplDropEnv(gym.Env):
                            #self.Y_MAX - self.HIKER_RELATIVE_POS - 1)
         x_pos = 5
         y_pos = 10
-        return x_pos, y_pos, 0
+        x_pos = self.HIKER_X
+        y_pos = self.HIKER_Y
+        alt = 0
+        return x_pos, y_pos, alt
 
     def _is_valid_hiker_pos(self):
         """ validate hikers initial position """
@@ -267,10 +269,10 @@ class AplDropEnv(gym.Env):
     def _one_step(self, action):
         """ Dynamics for actions. Follows APL """
         #self.no_movement = False
-        #prev_x = self.drone.actual_x
-        #prev_y = self.drone.actual_y
-        #prev_alt = self.drone.actual_alt
-        #prev_head = self.drone.actual_head
+        self.drone.prev_x = self.drone.actual_x
+        self.drone.prev_y = self.drone.actual_y
+        self.drone.prev_alt = self.drone.actual_alt
+        self.drone.prev_head = self.drone.actual_head
         next_x = self.drone.actual_x
         next_y = self.drone.actual_y
         next_alt = self.drone.actual_alt
@@ -311,21 +313,21 @@ class AplDropEnv(gym.Env):
         """
         if not is_valid_pos:
             return -1.
-        if action in {4, 5, 6}:
+        if action in {6}:
             return -1.
         distance = self._distance_to_hiker(self.drone.actual_x,
                                            self.drone.actual_y,
-                                           self.drone.actual_alt - 4,
+                                           self.drone.actual_alt - 1,
                                            normalise=True)
         if distance == 0:
-            #print("made it")
+            print("made it")
             return 1.
-        prev_distance = self._distance_to_hiker(self.drone.prev_x,
-                                                self.drone.prev_y,
-                                                self.drone.prev_alt - 4,
-                                                normalise=True)
-        if prev_distance - distance > 0:
-            return .1
+        #prev_distance = self._distance_to_hiker(self.drone.prev_x,
+                                                #self.drone.prev_y,
+                                                #self.drone.prev_alt - 1,
+                                                #normalise=True)
+        #if prev_distance - distance > 0:
+            #return .1
         return -.1
 
     def _get_observations(self, valid_drone_pos):
