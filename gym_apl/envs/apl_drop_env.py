@@ -119,6 +119,11 @@ class AplDropEnv(gym.Env):
         rd.seed()
         self.reset()
 
+    def __del__(self):
+        if self.viewer_ego is not None:
+            self.viewer_ego.close()
+            self.viewer_ego = None
+
     def step(self, action):
         """ Takes action and returns next state, reward, done flag and info """
         done = False
