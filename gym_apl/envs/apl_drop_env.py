@@ -3,11 +3,16 @@ import gym
 import math
 import time
 import numpy as np
+import tensorflow as tf
 import random as rd
 from gym import error, spaces, utils
 from gym.utils import seeding
 #from skimage.draw import circle_perimeter
 import skimage.draw as draw
+import sys
+
+
+from tensorflow.python.client import device_lib
 
 
 class Drone(object):
@@ -118,6 +123,99 @@ class AplDropEnv(gym.Env):
         rd.seed()
         self.reset()
 
+        #self.graph_rise = tf.Graph()
+        #with self.graph_rise.as_default(), tf.device("gpu:0"):
+            #self._create_graph_scope()
+            #self.sess_rise = tf.Session(
+                #graph=self.graph_rise,
+                #config=tf.ConfigProto(
+                    #allow_soft_placement=True,
+                    #log_device_placement=False,
+                    #gpu_options=tf.GPUOptions(allow_growth=True)))
+            ##with self.sess_rise.as_default():
+            #self.sess_rise.run(tf.global_variables_initializer())
+            #vars = tf.global_variables()
+            #self.saver_rise = tf.train.Saver({var.name: var for var in vars}, max_to_keep=0)
+            #self.saver_rise.restore(self.sess_rise, 'checkpoints/risetotop/network_00003000')
+
+    def _create_graph_scope(self):
+        #with tf.name_scope("risetotop"):
+            #self._create_graph()
+            #self.saver.restore(self.sess, "checkpoints/risetotop/network_00002001")
+        self.x_rise = tf.placeholder(
+            tf.float32, [None, 168, 168, 4], name='X')
+        self.y_r_rise = tf.placeholder(tf.float32, [None], name='Yr')
+        self.var_beta_rise = tf.placeholder(tf.float32, name='beta', shape=[])
+        self.var_learning_rate_rise = tf.placeholder(tf.float32, name='lr', shape=[])
+        self.global_step_rise = tf.Variable(0, trainable=False, name='step')
+        # As implemented in A3C paper
+        self.n1_rise = self.conv2d_layer(self.x_rise, 8, 16, 'conv11', strides=[1, 4, 4, 1])
+        self.n2_rise = self.conv2d_layer(self.n1_rise, 4, 32, 'conv12', strides=[1, 2, 2, 1])
+        self.action_index_rise = tf.placeholder(tf.float32, [None, 7])
+        _input = self.n2_rise
+        flatten_input_shape = _input.get_shape()
+        nb_elements = flatten_input_shape[1] * flatten_input_shape[2] * flatten_input_shape[3]
+        self.flat_rise = tf.reshape(_input, shape=[-1, nb_elements._value])
+        self.d1_rise = self.dense_layer(self.flat_rise, 256, 'dense1')
+        self.logits_v_rise = tf.squeeze(self.dense_layer(self.d1_rise, 1, 'logits_v', func=None), axis=[1])
+        self.cost_v_rise = 0.5 * tf.reduce_sum(tf.square(self.y_r_rise - self.logits_v_rise), axis=0)
+        self.logits_p_rise = self.dense_layer(self.d1_rise, 7, 'logits_p', func=None)
+        self.softmax_p_rise = (tf.nn.softmax(self.logits_p_rise) + 0.0) / (1.0 + 0.0 * 7)
+        self.selected_action_prob_rise = tf.reduce_sum(self.softmax_p_rise * self.action_index_rise, axis=1)
+        self.cost_p_1_rise = tf.log(tf.maximum(self.selected_action_prob_rise, 1e-6)) \
+                    * (self.y_r_rise - tf.stop_gradient(self.logits_v_rise))
+        self.cost_p_2_rise = -1 * self.var_beta_rise * \
+                    tf.reduce_sum(tf.log(tf.maximum(self.softmax_p_rise, 1e-6)) *
+                                  self.softmax_p_rise, axis=1)
+        self.cost_p_1_agg_rise = tf.reduce_sum(self.cost_p_1_rise, axis=0)
+        self.cost_p_2_agg_rise = tf.reduce_sum(self.cost_p_2_rise, axis=0)
+        self.cost_p_rise = -(self.cost_p_1_agg_rise + self.cost_p_2_agg_rise)
+        self.cost_all_rise = self.cost_p_rise + self.cost_v_rise
+        self.opt_rise = tf.train.RMSPropOptimizer(
+            learning_rate=self.var_learning_rate_rise,
+            decay=0.99,
+            momentum=0.0,
+            epsilon=0.1)
+        self.train_op_rise = self.opt_rise.minimize(self.cost_all_rise, global_step=self.global_step_rise)
+
+
+    def dense_layer(self, input, out_dim, name, func=tf.nn.relu):
+        in_dim = input.get_shape().as_list()[-1]
+        d = 1.0 / np.sqrt(in_dim)
+        with tf.variable_scope(name):
+            w_init = tf.random_uniform_initializer(-d, d)
+            b_init = tf.random_uniform_initializer(-d, d)
+            w = tf.get_variable('w', dtype=tf.float32, shape=[in_dim, out_dim], initializer=w_init)
+            b = tf.get_variable('b', shape=[out_dim], initializer=b_init)
+
+            output = tf.matmul(input, w) + b
+            if func is not None:
+                output = func(output)
+
+        return output
+
+    def conv2d_layer(self, input, filter_size, out_dim, name, strides, func=tf.nn.relu):
+        in_dim = input.get_shape().as_list()[-1]
+        d = 1.0 / np.sqrt(filter_size * filter_size * in_dim)
+        with tf.variable_scope(name):
+            w_init = tf.random_uniform_initializer(-d, d)
+            b_init = tf.random_uniform_initializer(-d, d)
+            w = tf.get_variable('w',
+                                shape=[filter_size, filter_size, in_dim, out_dim],
+                                dtype=tf.float32,
+                                initializer=w_init)
+            b = tf.get_variable('b', shape=[out_dim], initializer=b_init)
+
+            output = tf.nn.conv2d(input, w, strides=strides, padding='SAME') + b
+            if func is not None:
+                output = func(output)
+
+        return output
+
+    @staticmethod
+    def _rgb2gray(rgb):
+        return np.dot(rgb[..., :3], [0.299, 0.587, 0.114])
+
     def step(self, action):
         """ Takes action and returns next state, reward, done flag and info """
         done = False
@@ -133,6 +231,15 @@ class AplDropEnv(gym.Env):
            self.number_step == self.MAX_STEPS or self._is_done():
             done = True
         self.observations = self._get_observations(valid_drone_pos)
+        _x = self._rgb2gray(self.observations)
+        _x = np.array([_x, _x, _x, _x])
+        _x = np.transpose(_x, [1, 2, 0])  # move channels
+        _x = _x.astype(np.float32) / 128.0 - 1.0
+        _x = np.array([_x])
+        #with self.sess_rise.as_default(): 
+        #with tf.device("cpu:0"):
+        #p, v = self.sess_rise.run([self.softmax_p_rise, self.logits_v_rise], feed_dict={self.x_rise: _x})
+        #print("LA ACTION del RISE:", p, v)
         if action == -1:  # intialisation
             reward = .0
         else:
